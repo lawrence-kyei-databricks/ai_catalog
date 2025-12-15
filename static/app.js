@@ -249,15 +249,21 @@ async function loadReview() {
         listEl.innerHTML = data.items.map(c => `
             <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px; margin-bottom: 12px;">
                 <div style="display: flex; justify-content: space-between; align-items: start;">
-                    <div>
+                    <div style="flex: 1;">
                         <strong>${c.catalog_name}.${c.schema_name}.${c.table_name}.${c.column_name}</strong>
                         <div style="margin-top: 8px; color: #64748b; font-size: 14px;">
-                            Suggested: <strong>${c.suggested_element}</strong>
-                            <span style="color: #3b82f6; margin-left: 12px;">${c.confidence_score}% confidence</span>
+                            <div>Type: <strong>${c.column_type || 'Unknown'}</strong></div>
+                            <div style="margin-top: 4px;">
+                                Classification: <strong style="color: #3b82f6;">${c.suggested_category || 'N/A'}</strong>
+                                ${c.suggested_element ? ` - ${c.suggested_element}` : ''}
+                            </div>
+                            <div style="margin-top: 4px;">
+                                Confidence: <span style="color: #16a34a; font-weight: 600;">${Math.round(c.confidence_score)}%</span>
+                            </div>
                         </div>
                     </div>
-                    <div>
-                        <button class="btn btn-primary" style="margin-right: 8px;" onclick="approveClassification(${c.id})">Approve</button>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-primary" onclick="approveClassification(${c.id})">Approve</button>
                         <button class="btn btn-secondary" onclick="rejectClassification(${c.id})">Reject</button>
                     </div>
                 </div>

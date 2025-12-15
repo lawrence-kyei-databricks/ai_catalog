@@ -417,13 +417,14 @@ def get_classifications():
         limit = int(request.args.get('limit', 100))
 
         # Build query
-        where_clauses = [f"review_status = '{status}'"]
+        # Handle NULL review_status for pending records
+        if status == 'PENDING':
+            where_clauses = ["(review_status IS NULL OR review_status = 'PENDING')"]
+        else:
+            where_clauses = [f"review_status = '{status}'"]
 
         if priority:
             where_clauses.append(f"review_priority = '{priority}'")
-
-        if status == 'PENDING':
-            where_clauses.append("requires_review = TRUE")
 
         where_clause = ' AND '.join(where_clauses)
 
@@ -638,10 +639,10 @@ def get_dashboard_stats():
         stats_sql = """
         SELECT
             COUNT(*) as total_classified,
-            COUNT(CASE WHEN review_status = 'PENDING' THEN 1 END) as pending_review,
-            COUNT(CASE WHEN review_status IN ('APPROVED', 'AUTO_APPROVED') THEN 1 END) as approved,
-            COUNT(CASE WHEN review_status = 'APPLIED' THEN 1 END) as applied,
-            COUNT(CASE WHEN sensitive_flag = TRUE THEN 1 END) as sensitive_count,
+            SUM(CASE WHEN (review_status IS NULL OR review_status = 'PENDING') THEN 1 ELSE 0 END) as pending_review,
+            SUM(CASE WHEN review_status IN ('APPROVED', 'AUTO_APPROVED') THEN 1 ELSE 0 END) as approved,
+            SUM(CASE WHEN review_status = 'APPLIED' THEN 1 ELSE 0 END) as applied,
+            SUM(CASE WHEN sensitive_flag = TRUE THEN 1 ELSE 0 END) as sensitive_count,
             AVG(confidence_score) as avg_confidence
         FROM main.carmax_governance.classification_governance
         """
