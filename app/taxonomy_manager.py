@@ -330,6 +330,11 @@ class TaxonomyManager:
         """Execute SQL and return results"""
 
         try:
+            if not self.warehouse_id:
+                raise Exception(f"warehouse_id is not set! warehouse_id={self.warehouse_id}")
+
+            print(f"[TaxonomyManager] Executing SQL with warehouse_id={self.warehouse_id}")
+
             statement = self.w.statement_execution.execute_statement(
                 statement=sql,
                 warehouse_id=self.warehouse_id,
@@ -343,7 +348,8 @@ class TaxonomyManager:
                 statement = self.w.statement_execution.get_statement(statement.statement_id)
 
             if statement.status.state != 'SUCCEEDED':
-                raise Exception(f"Query failed: {statement.status.error}")
+                error_msg = statement.status.error.message if statement.status.error else f"State: {statement.status.state}"
+                raise Exception(f"Query failed: {error_msg}")
 
             # Extract results
             if hasattr(statement, 'result') and statement.result:
@@ -356,6 +362,7 @@ class TaxonomyManager:
 
         except Exception as e:
             print(f"[TaxonomyManager] SQL Error: {e}")
+            print(f"[TaxonomyManager] warehouse_id={self.warehouse_id}")
             raise
 
     def _quote(self, value: str) -> str:
