@@ -3,16 +3,19 @@ CarMax Data Classification Platform - Flask API
 Simple, clean backend for classification workflow
 """
 
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, render_template
 from flask_cors import CORS
 from databricks.sdk import WorkspaceClient
+from werkzeug.utils import secure_filename
 import os
 import json
+import tempfile
 
 from .taxonomy_manager import TaxonomyManager
 from .classification_engine import ClassificationEngine
+from .init_taxonomy import init_taxonomy
 
-app = Flask(__name__, static_folder='../static')
+app = Flask(__name__, static_folder='../static', template_folder='templates')
 CORS(app)
 
 # Initialize Databricks client
@@ -25,6 +28,25 @@ classifier = ClassificationEngine(w, taxonomy_mgr)
 # Configuration
 WAREHOUSE_ID = os.environ.get('WAREHOUSE_ID')
 TARGET_CATALOG = os.environ.get('TARGET_CATALOG', 'main')
+
+# Auto-initialize taxonomy on startup
+try:
+    print("Checking taxonomy initialization...")
+    init_result = init_taxonomy()
+    print(f"Taxonomy initialization result: {init_result}")
+except Exception as e:
+    print(f"Warning: Could not auto-initialize taxonomy: {e}")
+    print("You can manually import using /api/taxonomy/import endpoint")
+
+# ========================================
+# HOME PAGE
+# ========================================
+
+@app.route('/', methods=['GET'])
+def home():
+    """Serve home page"""
+    return render_template('index.html')
+
 
 # ========================================
 # TAXONOMY ENDPOINTS
@@ -57,6 +79,84 @@ def get_taxonomy():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# ========================================
+# ADMIN ENDPOINTS
+# ========================================
+
+@app.route('/admin', methods=['GET'])
+def admin_page():
+    """Serve admin page for taxonomy management"""
+    return render_template('admin.html')
+
+
+@app.route('/api/admin/taxonomy-status', methods=['GET'])
+def taxonomy_status():
+    """Check if taxonomy is initialized"""
+    try:
+        check_sql = "SELECT COUNT(*) as cnt FROM main.carmax_taxonomy.data_elements"
+        result = _execute_sql(check_sql)
+
+        if result and len(result) > 0:
+            element_count = result[0]['cnt'] if isinstance(result[0], dict) else result[0][0]
+
+            if element_count > 0:
+                # Get additional stats
+                tags_sql = "SELECT COUNT(*) as cnt FROM main.carmax_taxonomy.data_elements WHERE active = true"
+                tags_result = _execute_sql(tags_sql)
+                tags_count = tags_result[0]['cnt'] if tags_result and len(tags_result) > 0 else 0
+
+                subjects_sql = "SELECT COUNT(*) as cnt FROM main.carmax_taxonomy.subject_types"
+                subjects_result = _execute_sql(subjects_sql)
+                subjects_count = subjects_result[0]['cnt'] if subjects_result and len(subjects_result) > 0 else 0
+
+                return jsonify({
+                    'initialized': True,
+                    'stats': {
+                        'elements': element_count,
+                        'tags': tags_count,
+                        'subjects': subjects_count
+                    }
+                })
+
+        return jsonify({'initialized': False})
+
+    except Exception as e:
+        return jsonify({'initialized': False, 'error': str(e)})
+
+
+@app.route('/api/admin/import-taxonomy', methods=['POST'])
+def admin_import_taxonomy():
+    """Handle file upload and import taxonomy"""
+    try:
+        # Check if files were uploaded
+        if 'elements_file' not in request.files or 'subjects_file' not in request.files:
+            return jsonify({'success': False, 'error': 'Both files are required'}), 400
+
+        elements_file = request.files['elements_file']
+        subjects_file = request.files['subjects_file']
+        version = request.form.get('version', '1.0')
+
+        # Validate files
+        if elements_file.filename == '' or subjects_file.filename == '':
+            return jsonify({'success': False, 'error': 'No files selected'}), 400
+
+        # Save files temporarily
+        with tempfile.TemporaryDirectory() as tmpdir:
+            elements_path = os.path.join(tmpdir, secure_filename(elements_file.filename))
+            subjects_path = os.path.join(tmpdir, secure_filename(subjects_file.filename))
+
+            elements_file.save(elements_path)
+            subjects_file.save(subjects_path)
+
+            # Import taxonomy
+            result = taxonomy_mgr.import_from_excel(elements_path, subjects_path, version)
+
+            return jsonify({'success': True, **result})
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 # ========================================
