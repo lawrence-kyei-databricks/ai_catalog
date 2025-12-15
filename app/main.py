@@ -478,16 +478,13 @@ def get_dashboard_stats():
 
 
 # ========================================
-# STATIC FILES (React App)
+# STATIC FILES
 # ========================================
 
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>')
-def serve_react(path):
-    """Serve React app"""
-    if path and os.path.exists(os.path.join(app.static_folder, path)):
-        return send_from_directory(app.static_folder, path)
-    return send_from_directory(app.static_folder, 'index.html')
+@app.route('/static/<path:path>')
+def serve_static(path):
+    """Serve static files"""
+    return send_from_directory(app.static_folder, path)
 
 
 # ========================================
