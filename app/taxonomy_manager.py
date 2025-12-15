@@ -13,6 +13,7 @@ import pandas as pd
 import json
 import hashlib
 import re
+import os
 from typing import Dict, List, Optional
 from datetime import datetime
 from databricks.sdk import WorkspaceClient
@@ -23,8 +24,9 @@ class TaxonomyManager:
     Manage CarMax data classification taxonomy lifecycle
     """
 
-    def __init__(self, w: WorkspaceClient):
+    def __init__(self, w: WorkspaceClient, warehouse_id: str = None):
         self.w = w
+        self.warehouse_id = warehouse_id or os.environ.get('WAREHOUSE_ID')
         self.taxonomy_schema = "main.carmax_taxonomy"
         self.tags_schema = "main.carmax_tags"
 
@@ -330,7 +332,7 @@ class TaxonomyManager:
         try:
             statement = self.w.statement_execution.execute_statement(
                 statement=sql,
-                warehouse_id=None,  # Will be set from environment
+                warehouse_id=self.warehouse_id,
                 wait_timeout='30s'
             )
 

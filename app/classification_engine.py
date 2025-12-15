@@ -28,6 +28,7 @@ class ClassificationEngine:
     def __init__(self, w: WorkspaceClient, taxonomy_manager: TaxonomyManager):
         self.w = w
         self.taxonomy_manager = taxonomy_manager
+        self.warehouse_id = os.environ.get('WAREHOUSE_ID')
         self.model = os.environ.get('MODEL_ENDPOINT', 'databricks-claude-3-7-sonnet')
         self.governance_schema = "main.carmax_governance"
 
@@ -452,10 +453,35 @@ Return ONLY valid JSON in this exact format:
         self._execute_sql(sql)
 
     def _execute_sql(self, sql: str) -> List[Dict]:
-        """Execute SQL (reuse from taxonomy_manager)"""
-        # Implementation same as TaxonomyManager._execute_sql
-        # (omitted for brevity - will use shared utility)
-        pass
+        """Execute SQL and return results"""
+        try:
+            statement = self.w.statement_execution.execute_statement(
+                statement=sql,
+                warehouse_id=self.warehouse_id,
+                wait_timeout='30s'
+            )
+
+            # Wait for completion
+            import time
+            while statement.status.state in ['PENDING', 'RUNNING']:
+                time.sleep(1)
+                statement = self.w.statement_execution.get_statement(statement.statement_id)
+
+            # Check for errors
+            if statement.status.state == 'FAILED':
+                raise Exception(f"SQL execution failed: {statement.status.error.message if statement.status.error else 'Unknown error'}")
+
+            # Parse results
+            if hasattr(statement, 'result') and statement.result:
+                columns = [col.name for col in statement.manifest.schema.columns] if statement.manifest else []
+                data_array = statement.result.data_array if statement.result.data_array else []
+                return [dict(zip(columns, row)) for row in data_array]
+
+            return []
+
+        except Exception as e:
+            print(f"[ClassificationEngine] SQL Error: {e}")
+            raise
 
     def _quote(self, value) -> str:
         """SQL quote helper"""

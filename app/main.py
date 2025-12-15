@@ -39,13 +39,13 @@ except Exception as e:
     print("You can manually import using /api/taxonomy/import endpoint")
 
 # ========================================
-# HOME PAGE
+# MAIN APP PAGE
 # ========================================
 
 @app.route('/', methods=['GET'])
 def home():
-    """Serve home page"""
-    return render_template('index.html')
+    """Serve unified app interface"""
+    return render_template('app.html')
 
 
 # ========================================
@@ -84,12 +84,6 @@ def get_taxonomy():
 # ========================================
 # ADMIN ENDPOINTS
 # ========================================
-
-@app.route('/admin', methods=['GET'])
-def admin_page():
-    """Serve admin page for taxonomy management"""
-    return render_template('admin.html')
-
 
 @app.route('/api/admin/taxonomy-status', methods=['GET'])
 def taxonomy_status():
