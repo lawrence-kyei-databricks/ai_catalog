@@ -18,16 +18,16 @@ from .init_taxonomy import init_taxonomy
 app = Flask(__name__, static_folder='../static', template_folder='templates')
 CORS(app)
 
-# Initialize Databricks client
-w = WorkspaceClient()
-
-# Initialize services
-taxonomy_mgr = TaxonomyManager(w)
-classifier = ClassificationEngine(w, taxonomy_mgr)
-
 # Configuration
 WAREHOUSE_ID = os.environ.get('WAREHOUSE_ID')
 TARGET_CATALOG = os.environ.get('TARGET_CATALOG', 'main')
+
+# Initialize Databricks client
+w = WorkspaceClient()
+
+# Initialize services with warehouse_id
+taxonomy_mgr = TaxonomyManager(w, warehouse_id=WAREHOUSE_ID)
+classifier = ClassificationEngine(w, taxonomy_mgr)
 
 # Auto-initialize taxonomy on startup
 try:
