@@ -17,7 +17,7 @@ def init_taxonomy():
         w = WorkspaceClient()
         taxonomy_mgr = TaxonomyManager(w)
 
-        # Check if taxonomy already exists
+        # Check if taxonomy tables exist and are initialized
         try:
             check_sql = "SELECT COUNT(*) as cnt FROM main.carmax_taxonomy.data_elements"
             result = taxonomy_mgr._execute_sql(check_sql)
@@ -25,38 +25,23 @@ def init_taxonomy():
             if result and len(result) > 0:
                 count = result[0]['cnt'] if isinstance(result[0], dict) else result[0][0]
                 if count > 0:
-                    print(f"Taxonomy already initialized with {count} elements. Skipping import.")
+                    print(f"✓ Taxonomy already initialized with {count} elements.")
                     return {"status": "already_initialized", "count": count}
+                else:
+                    print("Taxonomy tables exist but are empty. Use the Taxonomy tab in the UI to upload Excel files.")
+                    return {"status": "tables_exist_but_empty"}
         except Exception as e:
-            print(f"Taxonomy table doesn't exist yet or error checking: {e}")
-
-        # Get the workspace file paths for Excel files
-        # These files are deployed with the app bundle
-        base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        elements_file = os.path.join(base_path, 'Data_Element_Descriptions.xlsx')
-        subjects_file = os.path.join(base_path, 'Personal Data_2025-11-14T14_18_26 (1).xlsx')
-
-        print(f"Importing taxonomy from Excel files...")
-        print(f"Elements file: {elements_file}")
-        print(f"Subjects file: {subjects_file}")
-
-        # Import taxonomy
-        result = taxonomy_mgr.import_from_excel(
-            elements_file=elements_file,
-            subjects_file=subjects_file,
-            version='1.0'
-        )
-
-        print(f"✓ Taxonomy initialized successfully!")
-        print(f"  - Elements imported: {result['elements_imported']}")
-        print(f"  - Tags created: {result['tags_created']}")
-
-        return result
+            # Tables don't exist yet - this is expected on first run
+            print("Taxonomy tables not found. Please run the SQL setup scripts first:")
+            print("  1. Run sql/setup_taxonomy.sql in Databricks SQL Editor")
+            print("  2. Run sql/setup_governance.sql in Databricks SQL Editor")
+            print("  3. Grant permissions to the service principal")
+            print("  4. Use the Taxonomy tab in the UI to upload Excel files")
+            return {"status": "tables_not_found", "message": "Run SQL setup scripts first"}
 
     except Exception as e:
-        print(f"Error initializing taxonomy: {e}")
-        print("You can manually import using the /api/taxonomy/import endpoint")
-        return {"status": "error", "error": str(e)}
+        print(f"Startup check completed with info: {e}")
+        return {"status": "info", "message": "App ready - configure taxonomy via UI"}
 
 
 if __name__ == "__main__":
