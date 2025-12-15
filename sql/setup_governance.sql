@@ -121,20 +121,13 @@ GROUP BY ALL;
 -- REFRESH ON SCHEDULE CRON '*/15 * * * *';
 
 -- =====================================================
--- INDEXES for Performance
+-- Performance Optimization Notes
 -- =====================================================
-CREATE INDEX IF NOT EXISTS idx_review_status
-ON main.carmax_governance.classification_governance (review_status, review_priority);
-
-CREATE INDEX IF NOT EXISTS idx_catalog_schema
-ON main.carmax_governance.classification_governance (catalog_name, schema_name);
-
-CREATE INDEX IF NOT EXISTS idx_created_at
-ON main.carmax_governance.classification_governance (created_at);
-
-CREATE INDEX IF NOT EXISTS idx_fingerprint
-ON main.carmax_governance.classification_governance (column_fingerprint)
-WHERE column_fingerprint IS NOT NULL;
+-- Delta tables use automatic optimizations:
+-- - Liquid Clustering: Already configured via CLUSTER BY (review_status, review_priority, catalog_name, schema_name)
+-- - Z-Ordering: Can be added via OPTIMIZE table_name ZORDER BY (column_fingerprint)
+-- - Automatic data skipping and statistics
+-- Traditional CREATE INDEX is not supported in Delta Lake
 
 -- =====================================================
 -- HELPER VIEW: Pending Reviews

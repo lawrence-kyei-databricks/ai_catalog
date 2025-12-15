@@ -100,13 +100,13 @@ USING DELTA
 COMMENT 'Track element name changes for backward compatibility';
 
 -- =====================================================
--- Indexes for performance
+-- Performance Optimization Notes
 -- =====================================================
-CREATE INDEX IF NOT EXISTS idx_elements_active
-ON main.carmax_taxonomy.data_elements (active, element_category);
-
-CREATE INDEX IF NOT EXISTS idx_elements_sensitive
-ON main.carmax_taxonomy.data_elements (sensitive_flag);
+-- Delta tables use automatic optimizations:
+-- - Liquid Clustering (already configured via CLUSTER BY)
+-- - Z-Ordering (can be added via OPTIMIZE ... ZORDER BY)
+-- - Automatic data skipping
+-- Traditional CREATE INDEX is not supported in Delta Lake
 
 -- =====================================================
 -- Sample data for testing (optional)
