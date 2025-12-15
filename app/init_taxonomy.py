@@ -35,6 +35,7 @@ def init_taxonomy(warehouse_id: str = None):
 
             if result and len(result) > 0:
                 count = result[0]['cnt'] if isinstance(result[0], dict) else result[0][0]
+                count = int(count)  # Convert to int (SQL results sometimes return strings)
                 if count > 0:
                     print(f"✓ Taxonomy already initialized with {count} elements.")
                     return {"status": "already_initialized", "count": count}

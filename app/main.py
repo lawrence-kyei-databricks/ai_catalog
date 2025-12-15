@@ -95,16 +95,17 @@ def taxonomy_status():
 
         if result and len(result) > 0:
             element_count = result[0]['cnt'] if isinstance(result[0], dict) else result[0][0]
+            element_count = int(element_count)  # Convert to int (SQL results sometimes return strings)
 
             if element_count > 0:
                 # Get additional stats
                 tags_sql = "SELECT COUNT(*) as cnt FROM main.carmax_taxonomy.data_elements WHERE active = true"
                 tags_result = _execute_sql(tags_sql)
-                tags_count = tags_result[0]['cnt'] if tags_result and len(tags_result) > 0 else 0
+                tags_count = int(tags_result[0]['cnt']) if tags_result and len(tags_result) > 0 else 0
 
                 subjects_sql = "SELECT COUNT(*) as cnt FROM main.carmax_taxonomy.subject_types"
                 subjects_result = _execute_sql(subjects_sql)
-                subjects_count = subjects_result[0]['cnt'] if subjects_result and len(subjects_result) > 0 else 0
+                subjects_count = int(subjects_result[0]['cnt']) if subjects_result and len(subjects_result) > 0 else 0
 
                 return jsonify({
                     'initialized': True,
