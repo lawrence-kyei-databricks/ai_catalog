@@ -20,18 +20,13 @@ def init_taxonomy(warehouse_id: str = None):
         if not warehouse_id:
             warehouse_id = os.environ.get('WAREHOUSE_ID')
 
-        print(f"[init_taxonomy] warehouse_id={warehouse_id}")
-        print(f"[init_taxonomy] warehouse_id type={type(warehouse_id)}")
-
         w = WorkspaceClient()
         taxonomy_mgr = TaxonomyManager(w, warehouse_id=warehouse_id)
 
         # Check if taxonomy tables exist and are initialized
         try:
             check_sql = "SELECT COUNT(*) as cnt FROM main.carmax_taxonomy.data_elements"
-            print(f"[init_taxonomy] Executing: {check_sql}")
             result = taxonomy_mgr._execute_sql(check_sql)
-            print(f"[init_taxonomy] Query result: {result}")
 
             if result and len(result) > 0:
                 count = result[0]['cnt'] if isinstance(result[0], dict) else result[0][0]
