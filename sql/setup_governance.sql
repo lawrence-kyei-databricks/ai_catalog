@@ -55,10 +55,9 @@ CREATE TABLE IF NOT EXISTS main.carmax_governance.classification_governance (
   ),
 
   -- Performance optimization
-  column_fingerprint STRING COMMENT 'Hash for caching similar columns',
+  column_fingerprint STRING COMMENT 'Hash for caching similar columns'
 
-  -- Unique constraint: one classification per column
-  CONSTRAINT unique_column UNIQUE (catalog_name, schema_name, table_name, column_name)
+  -- Note: Uniqueness (one classification per column) enforced in application via MERGE statements
 )
 USING DELTA
 CLUSTER BY (review_status, review_priority, catalog_name, schema_name)
