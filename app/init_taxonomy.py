@@ -20,13 +20,18 @@ def init_taxonomy(warehouse_id: str = None):
         if not warehouse_id:
             warehouse_id = os.environ.get('WAREHOUSE_ID')
 
+        print(f"[init_taxonomy] warehouse_id={warehouse_id}")
+        print(f"[init_taxonomy] warehouse_id type={type(warehouse_id)}")
+
         w = WorkspaceClient()
         taxonomy_mgr = TaxonomyManager(w, warehouse_id=warehouse_id)
 
         # Check if taxonomy tables exist and are initialized
         try:
             check_sql = "SELECT COUNT(*) as cnt FROM main.carmax_taxonomy.data_elements"
+            print(f"[init_taxonomy] Executing: {check_sql}")
             result = taxonomy_mgr._execute_sql(check_sql)
+            print(f"[init_taxonomy] Query result: {result}")
 
             if result and len(result) > 0:
                 count = result[0]['cnt'] if isinstance(result[0], dict) else result[0][0]
@@ -38,6 +43,10 @@ def init_taxonomy(warehouse_id: str = None):
                     return {"status": "tables_exist_but_empty"}
         except Exception as e:
             # Tables don't exist yet - this is expected on first run
+            print(f"[init_taxonomy] ERROR in table check: {e}")
+            print(f"[init_taxonomy] Error type: {type(e)}")
+            import traceback
+            traceback.print_exc()
             print("Taxonomy tables not found. Please run the SQL setup scripts first:")
             print("  1. Run sql/setup_taxonomy.sql in Databricks SQL Editor")
             print("  2. Run sql/setup_governance.sql in Databricks SQL Editor")
