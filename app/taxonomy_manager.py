@@ -17,6 +17,7 @@ import os
 from typing import Dict, List, Optional
 from datetime import datetime
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.sql import StatementState
 
 
 class TaxonomyManager:
@@ -343,11 +344,11 @@ class TaxonomyManager:
 
             # Wait for completion
             import time
-            while statement.status.state in ['PENDING', 'RUNNING']:
+            while statement.status.state in [StatementState.PENDING, StatementState.RUNNING]:
                 time.sleep(1)
                 statement = self.w.statement_execution.get_statement(statement.statement_id)
 
-            if statement.status.state != 'SUCCEEDED':
+            if statement.status.state != StatementState.SUCCEEDED:
                 error_msg = statement.status.error.message if statement.status.error else f"State: {statement.status.state}"
                 raise Exception(f"Query failed: {error_msg}")
 

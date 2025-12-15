@@ -17,6 +17,7 @@ import time
 import os
 from typing import Dict, List, Optional
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.sql import StatementState
 from .taxonomy_manager import TaxonomyManager
 
 
@@ -463,12 +464,12 @@ Return ONLY valid JSON in this exact format:
 
             # Wait for completion
             import time
-            while statement.status.state in ['PENDING', 'RUNNING']:
+            while statement.status.state in [StatementState.PENDING, StatementState.RUNNING]:
                 time.sleep(1)
                 statement = self.w.statement_execution.get_statement(statement.statement_id)
 
             # Check for errors
-            if statement.status.state == 'FAILED':
+            if statement.status.state == StatementState.FAILED:
                 raise Exception(f"SQL execution failed: {statement.status.error.message if statement.status.error else 'Unknown error'}")
 
             # Parse results

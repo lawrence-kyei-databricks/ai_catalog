@@ -6,6 +6,7 @@ Simple, clean backend for classification workflow
 from flask import Flask, request, jsonify, send_from_directory, render_template
 from flask_cors import CORS
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.sql import StatementState
 from werkzeug.utils import secure_filename
 import os
 import json
@@ -525,11 +526,11 @@ def _execute_sql(sql):
     )
 
     import time
-    while statement.status.state in ['PENDING', 'RUNNING']:
+    while statement.status.state in [StatementState.PENDING, StatementState.RUNNING]:
         time.sleep(1)
         statement = w.statement_execution.get_statement(statement.statement_id)
 
-    if statement.status.state != 'SUCCEEDED':
+    if statement.status.state != StatementState.SUCCEEDED:
         raise Exception(f"Query failed: {statement.status.error}")
 
     if hasattr(statement, 'result') and statement.result:
