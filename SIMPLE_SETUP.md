@@ -1,10 +1,10 @@
-# CarMax Data Classification - Simple Setup Guide
+# Data Classification Platform - Simple Setup Guide
 
 ## Prerequisites
 
 1. Databricks workspace
-2. SQL Warehouse ID: `8baced1ff014912d`
-3. Two Excel files with your taxonomy data
+2. SQL Warehouse ID
+3. Your organization's taxonomy data in Excel format
 4. Databricks CLI installed
 
 ## Setup Steps
@@ -43,40 +43,40 @@ Then run:
 
 ```bash
 cd ai_catalog
-export WAREHOUSE_ID="8baced1ff014912d"
+export WAREHOUSE_ID="<your_warehouse_id>"
 python3 scripts/import_taxonomy.py
 ```
 
 ### 3. Deploy the App
 
 ```bash
-export DATABRICKS_CONFIG_PROFILE=e2-demo-field-eng
-databricks bundle deploy -t dev --var warehouse_id="8baced1ff014912d"
-databricks apps start carmax-classification-dev --profile e2-demo-field-eng
+export DATABRICKS_CONFIG_PROFILE=<your_profile>
+databricks bundle deploy -t dev --var warehouse_id="<your_warehouse_id>"
+databricks apps start <app_name>-dev --profile <your_profile>
 ```
 
 ### 4. Grant Permissions
 
 ```sql
 -- Get service principal ID from app
--- Run: databricks apps get carmax-classification-dev --profile e2-demo-field-eng
+-- Run: databricks apps get <app_name>-dev --profile <your_profile>
 
 -- Then grant permissions (replace <SP_ID>)
-GRANT ALL PRIVILEGES ON SCHEMA main.carmax_taxonomy TO `<SP_ID>`;
-GRANT ALL PRIVILEGES ON SCHEMA main.carmax_governance TO `<SP_ID>`;
-GRANT ALL PRIVILEGES ON SCHEMA main.carmax_tags TO `<SP_ID>`;
+GRANT ALL PRIVILEGES ON SCHEMA main.<your_org>_taxonomy TO `<SP_ID>`;
+GRANT ALL PRIVILEGES ON SCHEMA main.<your_org>_governance TO `<SP_ID>`;
+GRANT ALL PRIVILEGES ON SCHEMA main.<your_org>_tags TO `<SP_ID>`;
 ```
 
 ## That's It!
 
-Your app is now ready at:
-https://carmax-classification-dev-1444828305810485.aws.databricksapps.com
+Your app is now ready!
 
 ## Usage
 
 1. **Dashboard** - View stats
-2. **Classify** - Select catalog/schema and classify columns
-3. **Review** - Approve/reject classifications
+2. **Taxonomy** - Manage your data elements
+3. **Classify** - Select catalog/schema and classify columns
+4. **Review** - Approve/reject classifications
 
 ## Updating Taxonomy
 

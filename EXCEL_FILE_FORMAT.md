@@ -1,10 +1,10 @@
 # Excel File Format Requirements
 
-The CarMax Data Classification Platform requires 2 Excel files with specific column names.
+The Data Classification Platform requires 2 Excel files with specific column names.
 
 ## File 1: Data Elements (e.g., Data_Element_Descriptions.xlsx)
 
-This file contains your 172 CarMax data elements.
+This file contains your organization's data taxonomy elements.
 
 ### Required Columns:
 
@@ -43,7 +43,7 @@ This file contains your 172 CarMax data elements.
 
 ## File 2: Subject Types (e.g., Personal_Data_subject_types.xlsx)
 
-This file contains your 3 data subject types.
+This file contains your data subject types.
 
 ### Required Columns:
 
@@ -57,7 +57,7 @@ This file contains your 3 data subject types.
 
 3. **Description** (STRING, Required)
    - Description of this subject type
-   - Example: "Individual customers who interact with CarMax for personal or household purposes"
+   - Example: "Individual customers who interact with your organization"
 
 ### Example Subject Types File:
 
@@ -65,7 +65,7 @@ This file contains your 3 data subject types.
 |---------------------|----------------------|-------------|
 | aa2dfd55-ffa1-4bc6-b9e6-335564e3d89c | Associate | Internal personnel (e.g., employees, contractors) |
 | 2374b463-0605-4e51-96c1-332addd22e84 | B2B | External business contacts (e.g., vendors, partners) |
-| 1fdbd718-31f4-4613-a7ca-6564226a0dbf | Consumer | Individual customers who interact with CarMax for personal or household purposes |
+| 1fdbd718-31f4-4613-a7ca-6564226a0dbf | Consumer | Individual customers |
 
 ---
 
@@ -87,7 +87,7 @@ This file contains your 3 data subject types.
 
 ## Validation
 
-After you try to upload, the error message will now show:
+After you try to upload, the error message will show:
 - What columns were found in your file
 - What columns are required
 - What columns are missing

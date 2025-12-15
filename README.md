@@ -1,17 +1,18 @@
-# CarMax Data Classification Platform
+# Data Classification Platform
 
 AI-powered data classification for Unity Catalog using Claude 3.7 Sonnet.
 
 ## What It Does
 
-Automatically classifies database columns against CarMax's taxonomy of 172 data elements. Uses AI to identify sensitive data like SSN, email addresses, and personal information, then applies Unity Catalog tags for governance.
+Automatically classifies database columns against your organization's data taxonomy. Uses AI to identify sensitive data like SSN, email addresses, and personal information, then applies Unity Catalog tags for governance.
 
 ## Key Features
 
 - AI classification with Claude 3.7 Sonnet
-- Web UI for managing taxonomy and reviewing classifications
+- Web UI for managing your custom taxonomy
+- Support for any number of data elements
 - Automatic Unity Catalog tag application
-- Support for 172 CarMax data elements
+- Review and approve classifications before tagging
 
 ## Quick Setup
 
@@ -19,7 +20,7 @@ See **[SIMPLE_SETUP.md](SIMPLE_SETUP.md)** for step-by-step instructions.
 
 **Summary:**
 1. Create database tables (run SQL script)
-2. Import taxonomy from Excel files
+2. Import your taxonomy from Excel files
 3. Deploy the Databricks App
 4. Grant permissions to service principal
 
@@ -29,9 +30,10 @@ See **[SIMPLE_SETUP.md](SIMPLE_SETUP.md)** for step-by-step instructions.
 View statistics about your taxonomy and classifications.
 
 ### 2. Taxonomy Tab
-- View all 172 data elements
+- View all your data elements
 - Add, edit, or delete elements
 - Search and filter by category
+- Import taxonomy from Excel files
 
 ### 3. Classify Tab
 1. Select a catalog and schema
@@ -43,22 +45,22 @@ View statistics about your taxonomy and classifications.
 - Approve or reject suggestions
 - Edit classifications if needed
 
-## Excel File Format
+## Preparing Your Taxonomy
 
-Your taxonomy Excel files need these columns:
+Your organization's taxonomy should be provided in Excel format:
 
 **Data Elements File:**
-- Data Element Name
-- Data Category
+- Data Element Name (e.g., "Social Security Number")
+- Data Category (e.g., "Personal Identifiers")
 - Sensitive_Flag (Yes or No)
 - Description (optional)
 
 **Subject Types File:**
-- Data Subject Type Id
-- Data Subject Type Name
+- Data Subject Type Id (e.g., "CUSTOMER")
+- Data Subject Type Name (e.g., "Customer")
 - Description
 
-See **[EXCEL_FILE_FORMAT.md](EXCEL_FILE_FORMAT.md)** for details.
+See **[EXCEL_FILE_FORMAT.md](EXCEL_FILE_FORMAT.md)** for detailed format requirements.
 
 ## Project Structure
 
@@ -75,10 +77,25 @@ ai_catalog/
 └── databricks.yml         # Deployment config
 ```
 
+## Customization
+
+### Schema Names
+Update `databricks.yml` and SQL scripts to change schema names:
+- `<your_org>_taxonomy` - Data element definitions
+- `<your_org>_governance` - Classification tracking
+- `<your_org>_tags` - Unity Catalog tags
+
+### Branding
+Update these files for your organization:
+- `app/templates/app.html` - Header and title
+- `databricks.yml` - App name and description
+- `README.md` - This file
+
 ## Troubleshooting
 
 **No data elements showing:**
 - Make sure you ran the import script (see SIMPLE_SETUP.md Step 2)
+- Check that your Excel files match the required format
 
 **Permission errors:**
 - Grant ALL PRIVILEGES on schemas to service principal
@@ -102,6 +119,7 @@ ai_catalog/
 - SQL Warehouse with Unity Catalog
 - Databricks CLI
 - Python 3.9+
+- Your organization's data taxonomy in Excel format
 
 ## Support
 
