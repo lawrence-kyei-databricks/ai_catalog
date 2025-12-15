@@ -458,7 +458,7 @@ Return ONLY valid JSON in this exact format:
             statement = self.w.statement_execution.execute_statement(
                 statement=sql,
                 warehouse_id=self.warehouse_id,
-                wait_timeout='30s'
+                wait_timeout="50s"
             )
 
             # Wait for completion

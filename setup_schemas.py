@@ -25,7 +25,7 @@ def main():
         result = w.statement_execution.execute_statement(
             statement=taxonomy_sql,
             warehouse_id=warehouse_id,
-            wait_timeout="30s"
+            wait_timeout="50s"
         )
         print("   ✓ Taxonomy schema created successfully")
     except Exception as e:
@@ -36,7 +36,7 @@ def main():
         result = w.statement_execution.execute_statement(
             statement=governance_sql,
             warehouse_id=warehouse_id,
-            wait_timeout="30s"
+            wait_timeout="50s"
         )
         print("   ✓ Governance schema created successfully")
     except Exception as e:
@@ -47,7 +47,7 @@ def main():
         result = w.statement_execution.execute_statement(
             statement="SHOW SCHEMAS IN main LIKE 'carmax*'",
             warehouse_id=warehouse_id,
-            wait_timeout="30s"
+            wait_timeout="50s"
         )
         print("   ✓ Schemas verified:")
         if result.result and result.result.data_array:

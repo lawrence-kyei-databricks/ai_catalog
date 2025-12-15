@@ -521,7 +521,7 @@ def _execute_sql(sql):
     statement = w.statement_execution.execute_statement(
         statement=sql,
         warehouse_id=WAREHOUSE_ID,
-        wait_timeout='30s'
+        wait_timeout="50s"
     )
 
     import time
