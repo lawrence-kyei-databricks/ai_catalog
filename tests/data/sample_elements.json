@@ -1,0 +1,56 @@
+{
+  "elements": [
+    {
+      "Data Element Name": "Social Security Number",
+      "Data Category": "Identifiers",
+      "Description": "Government issued identification number",
+      "Sensitive_Flag": "Yes",
+      "Data Classification": "PII"
+    },
+    {
+      "Data Element Name": "Email Address",
+      "Data Category": "Identifiers",
+      "Description": "Electronic mail address",
+      "Sensitive_Flag": "No",
+      "Data Classification": "PII"
+    },
+    {
+      "Data Element Name": "Phone Number",
+      "Data Category": "Identifiers",
+      "Description": "Telephone contact number",
+      "Sensitive_Flag": "No",
+      "Data Classification": "PII"
+    },
+    {
+      "Data Element Name": "Credit Card / Debit Card Number",
+      "Data Category": "Payment Card Info",
+      "Description": "Payment card number",
+      "Sensitive_Flag": "Yes",
+      "Data Classification": "PCI"
+    },
+    {
+      "Data Element Name": "First Name",
+      "Data Category": "Demographic Info",
+      "Description": "Individual given name",
+      "Sensitive_Flag": "No",
+      "Data Classification": "PII"
+    }
+  ],
+  "subjects": [
+    {
+      "Data Subject Type Id": "associate",
+      "Data Subject Type Name": "Associate",
+      "Description": "Internal personnel (employees, contractors)"
+    },
+    {
+      "Data Subject Type Id": "b2b",
+      "Data Subject Type Name": "B2B",
+      "Description": "External business contacts (vendors, partners)"
+    },
+    {
+      "Data Subject Type Id": "consumer",
+      "Data Subject Type Name": "Consumer",
+      "Description": "Individual customers"
+    }
+  ]
+}

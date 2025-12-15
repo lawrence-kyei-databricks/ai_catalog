@@ -1,0 +1,34 @@
+# CarMax Data Classification Platform - DABs Configuration
+
+bundle:
+  name: carmax-classification
+
+variables:
+  warehouse_id:
+    description: "SQL Warehouse ID for queries"
+    default: "${lookup.warehouse_id}"
+
+include:
+  - resources/*.yml
+
+targets:
+  # Development environment
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: ${workspace.host}
+
+    variables:
+      catalog: "main"
+      environment: "dev"
+
+  # Production environment
+  prod:
+    mode: production
+    workspace:
+      host: ${workspace.host}
+
+    variables:
+      catalog: "carmax"
+      environment: "prod"
