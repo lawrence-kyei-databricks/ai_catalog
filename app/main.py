@@ -200,7 +200,7 @@ def delete_taxonomy_element(element_id):
 def taxonomy_status():
     """Check if taxonomy is initialized"""
     try:
-        check_sql = "SELECT COUNT(*) as cnt FROM main.carmax_taxonomy.data_elements"
+        check_sql = "SELECT COUNT(*) as cnt FROM main.carmax_taxonomy.data_elements WHERE active IS NULL OR active = TRUE"
         result = _execute_sql(check_sql)
 
         if result and len(result) > 0:
@@ -208,10 +208,14 @@ def taxonomy_status():
             element_count = int(element_count)  # Convert to int (SQL results sometimes return strings)
 
             if element_count > 0:
-                # Get additional stats
-                tags_sql = "SELECT COUNT(*) as cnt FROM main.carmax_taxonomy.data_elements WHERE active = true"
-                tags_result = _execute_sql(tags_sql)
-                tags_count = int(tags_result[0]['cnt']) if tags_result and len(tags_result) > 0 else 0
+                # Get additional stats - count applied classifications (actual UC tags)
+                tags_sql = "SELECT COUNT(*) as cnt FROM main.carmax_governance.classification_governance WHERE review_status = 'APPLIED'"
+                try:
+                    tags_result = _execute_sql(tags_sql)
+                    tags_count = int(tags_result[0]['cnt']) if tags_result and len(tags_result) > 0 else 0
+                except:
+                    # Governance table might not exist yet
+                    tags_count = 0
 
                 subjects_sql = "SELECT COUNT(*) as cnt FROM main.carmax_taxonomy.subject_types"
                 subjects_result = _execute_sql(subjects_sql)

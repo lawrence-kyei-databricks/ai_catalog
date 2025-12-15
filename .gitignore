@@ -1,3 +1,6 @@
 app/__pycache__/
 *.pyc
 __pycache__/
+
+# Local customizations (do not commit to keep repo generic)
+static/CarMax-Logo_YellowBox_HEX.png
