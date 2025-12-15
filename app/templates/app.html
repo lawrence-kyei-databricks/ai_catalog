@@ -335,12 +335,28 @@
 
                 <div class="form-group">
                     <label>Schema</label>
-                    <select id="schema-select" class="form-select">
+                    <select id="schema-select" class="form-select" onchange="loadTables()">
                         <option value="">Select schema...</option>
                     </select>
                 </div>
 
-                <button class="btn btn-primary" onclick="classifyColumns()">Classify Columns</button>
+                <div class="form-group">
+                    <label>Table (Optional - leave empty for all tables)</label>
+                    <select id="table-select" class="form-select" onchange="loadColumnsForSelection()">
+                        <option value="">All tables in schema</option>
+                    </select>
+                </div>
+
+                <div id="columns-selection" style="display: none; margin-top: 20px;">
+                    <label style="font-weight: 600; color: #1e293b; margin-bottom: 8px; display: block;">
+                        Columns to Classify (Optional - leave empty for all columns)
+                    </label>
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px; max-height: 300px; overflow-y: auto;">
+                        <div id="columns-checkboxes"></div>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" onclick="classifyColumns()" style="margin-top: 20px;">Classify Columns</button>
                 <div class="spinner" id="classify-spinner"></div>
             </div>
         </div>
@@ -348,7 +364,12 @@
         <!-- Review Tab -->
         <div id="review-tab" class="tab-content">
             <div class="card">
-                <h2>Review Classifications</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>Review Classifications</h2>
+                    <button class="btn btn-primary" onclick="applyTags()" style="background: #16a34a;">
+                        Apply Approved Tags to Unity Catalog
+                    </button>
+                </div>
                 <div id="review-message" class="message"></div>
                 <div id="review-list">
                     <p style="color: #64748b; text-align: center; padding: 40px;">

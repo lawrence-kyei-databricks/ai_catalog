@@ -103,8 +103,85 @@ async function loadSchemas() {
             option.textContent = schema;
             select.appendChild(option);
         });
+
+        // Reset table and columns
+        document.getElementById('table-select').innerHTML = '<option value="">All tables in schema</option>';
+        document.getElementById('columns-selection').style.display = 'none';
     } catch (error) {
         console.error('Schema load failed:', error);
+    }
+}
+
+// Load tables
+async function loadTables() {
+    const catalog = document.getElementById('catalog-select').value;
+    const schema = document.getElementById('schema-select').value;
+    if (!catalog || !schema) return;
+
+    try {
+        const response = await fetch(`/api/tables?catalog=${catalog}&schema=${schema}`);
+        const data = await response.json();
+
+        const select = document.getElementById('table-select');
+        select.innerHTML = '<option value="">All tables in schema</option>';
+
+        data.tables.forEach(table => {
+            const option = document.createElement('option');
+            option.value = table;
+            option.textContent = table;
+            select.appendChild(option);
+        });
+
+        // Reset columns
+        document.getElementById('columns-selection').style.display = 'none';
+    } catch (error) {
+        console.error('Table load failed:', error);
+    }
+}
+
+// Load columns for selection
+async function loadColumnsForSelection() {
+    const catalog = document.getElementById('catalog-select').value;
+    const schema = document.getElementById('schema-select').value;
+    const table = document.getElementById('table-select').value;
+
+    if (!catalog || !schema || !table) {
+        document.getElementById('columns-selection').style.display = 'none';
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/columns?catalog=${catalog}&schema=${schema}&table=${table}`);
+        const data = await response.json();
+
+        const checkboxContainer = document.getElementById('columns-checkboxes');
+        checkboxContainer.innerHTML = '';
+
+        if (data.columns && data.columns.length > 0) {
+            data.columns.forEach(col => {
+                const label = document.createElement('label');
+                label.style.display = 'block';
+                label.style.padding = '8px';
+                label.style.cursor = 'pointer';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = col.column_name;
+                checkbox.style.marginRight = '8px';
+
+                const text = document.createTextNode(`${col.column_name} (${col.data_type})`);
+
+                label.appendChild(checkbox);
+                label.appendChild(text);
+                checkboxContainer.appendChild(label);
+            });
+
+            document.getElementById('columns-selection').style.display = 'block';
+        } else {
+            document.getElementById('columns-selection').style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Column load failed:', error);
     }
 }
 
@@ -112,6 +189,7 @@ async function loadSchemas() {
 async function classifyColumns() {
     const catalog = document.getElementById('catalog-select').value;
     const schema = document.getElementById('schema-select').value;
+    const table = document.getElementById('table-select').value;
     const messageEl = document.getElementById('classify-message');
     const spinner = document.getElementById('classify-spinner');
 
@@ -120,13 +198,24 @@ async function classifyColumns() {
         return;
     }
 
+    // Get selected columns
+    const selectedColumns = [];
+    if (table) {
+        const checkboxes = document.querySelectorAll('#columns-checkboxes input[type="checkbox"]:checked');
+        checkboxes.forEach(cb => selectedColumns.push(cb.value));
+    }
+
     spinner.style.display = 'block';
 
     try {
+        const body = { catalog, schema };
+        if (table) body.tables = [table];
+        if (selectedColumns.length > 0) body.columns = selectedColumns;
+
         const response = await fetch('/api/classify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ catalog, schema })
+            body: JSON.stringify(body)
         });
 
         const data = await response.json();
@@ -198,6 +287,30 @@ async function rejectClassification(id) {
         showMessage('review', 'info', 'Classification rejected');
         loadReview();
         loadDashboard();
+    } catch (error) {
+        showMessage('review', 'error', `Error: ${error.message}`);
+    }
+}
+
+// Apply approved tags to Unity Catalog
+async function applyTags() {
+    try {
+        showMessage('review', 'info', 'Applying approved tags to Unity Catalog...');
+
+        const response = await fetch('/api/apply-tags', { method: 'POST' });
+        const data = await response.json();
+
+        if (response.ok) {
+            if (data.applied > 0) {
+                showMessage('review', 'success', `✓ Successfully applied ${data.applied} tags to Unity Catalog!`);
+            } else {
+                showMessage('review', 'info', 'No approved tags to apply');
+            }
+            loadReview();
+            loadDashboard();
+        } else {
+            showMessage('review', 'error', data.error || 'Failed to apply tags');
+        }
     } catch (error) {
         showMessage('review', 'error', `Error: ${error.message}`);
     }

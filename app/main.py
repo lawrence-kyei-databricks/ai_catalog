@@ -308,6 +308,55 @@ def list_schemas():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/tables', methods=['GET'])
+def list_tables():
+    """List tables in schema"""
+    try:
+        catalog = request.args.get('catalog', TARGET_CATALOG)
+        schema = request.args.get('schema')
+
+        if not schema:
+            return jsonify({'error': 'Schema required'}), 400
+
+        tables = [t.name for t in w.tables.list(catalog_name=catalog, schema_name=schema)]
+        return jsonify({'tables': tables})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/columns', methods=['GET'])
+def list_columns():
+    """List columns in table"""
+    try:
+        catalog = request.args.get('catalog', TARGET_CATALOG)
+        schema = request.args.get('schema')
+        table = request.args.get('table')
+
+        if not schema or not table:
+            return jsonify({'error': 'Schema and table required'}), 400
+
+        # Get columns from information schema
+        sql = f"""
+        SELECT
+            column_name,
+            data_type,
+            comment
+        FROM system.information_schema.columns
+        WHERE table_catalog = '{catalog}'
+          AND table_schema = '{schema}'
+          AND table_name = '{table}'
+          AND column_name NOT IN ('_rescued_data', '_metadata')
+        ORDER BY ordinal_position
+        """
+
+        columns = _execute_sql(sql)
+        return jsonify({'columns': columns})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 # ========================================
 # CLASSIFICATION ENDPOINTS
 # ========================================
@@ -318,12 +367,14 @@ def classify_columns():
     try:
         catalog = request.json.get('catalog', TARGET_CATALOG)
         schema = request.json.get('schema')
+        tables = request.json.get('tables', [])  # Optional list of tables
+        columns_filter = request.json.get('columns', [])  # Optional list of column names
 
         if not schema:
             return jsonify({'error': 'Schema required'}), 400
 
         # Get columns to classify
-        columns = _get_unclassified_columns(catalog, schema)
+        columns = _get_unclassified_columns(catalog, schema, tables, columns_filter)
 
         # Classify each column
         results = []
@@ -617,8 +668,34 @@ def serve_static(path):
 # HELPER FUNCTIONS
 # ========================================
 
-def _get_unclassified_columns(catalog, schema):
-    """Get columns that haven't been classified yet"""
+def _get_unclassified_columns(catalog, schema, tables=None, columns_filter=None):
+    """Get columns that haven't been classified yet
+
+    Args:
+        catalog: Catalog name
+        schema: Schema name
+        tables: Optional list of table names to filter
+        columns_filter: Optional list of column names to filter
+    """
+    where_clauses = [
+        f"c.table_catalog = '{catalog}'",
+        f"c.table_schema = '{schema}'",
+        "g.id IS NULL",
+        "c.column_name NOT IN ('_rescued_data', '_metadata')"
+    ]
+
+    # Add table filter if provided
+    if tables and len(tables) > 0:
+        table_list = "', '".join(tables)
+        where_clauses.append(f"c.table_name IN ('{table_list}')")
+
+    # Add column filter if provided
+    if columns_filter and len(columns_filter) > 0:
+        column_list = "', '".join(columns_filter)
+        where_clauses.append(f"c.column_name IN ('{column_list}')")
+
+    where_clause = ' AND '.join(where_clauses)
+
     sql = f"""
     SELECT
         c.table_catalog as catalog,
@@ -631,10 +708,7 @@ def _get_unclassified_columns(catalog, schema):
         AND c.table_schema = g.schema_name
         AND c.table_name = g.table_name
         AND c.column_name = g.column_name
-    WHERE c.table_catalog = '{catalog}'
-      AND c.table_schema = '{schema}'
-      AND g.id IS NULL
-      AND c.column_name NOT IN ('_rescued_data', '_metadata')
+    WHERE {where_clause}
     ORDER BY c.table_name, c.ordinal_position
     """
 
