@@ -9,11 +9,10 @@ This platform automatically classifies Unity Catalog columns against CarMax's 17
 **Key Features:**
 - Claude 3.7 Sonnet AI classification
 - Smart 3-tier auto-approval system
-- Pattern-based instant classification
-- Flexible taxonomy management (loads from your Excel files)
+- Web UI for taxonomy upload and management
 - Unity Catalog tag application
-- Web UI for human review
 - Deploy with Databricks Asset Bundles (DABs)
+- Single-page app with drag-and-drop file upload
 
 ---
 
@@ -22,73 +21,77 @@ This platform automatically classifies Unity Catalog columns against CarMax's 17
 ### Prerequisites
 - Databricks workspace (AWS, Azure, or GCP)
 - SQL Warehouse with Unity Catalog access
-- Databricks CLI installed
-- Your two Excel files:
-  - `Data_Element_Descriptions.xlsx` (172 elements)
-  - `Personal Data_2025-11-14T14_18_26 (1).xlsx` (3 subject types)
+- Databricks CLI installed (`pip install databricks-cli`)
+- Your two Excel files (see `data/` folder for examples):
+  - Data Element Descriptions (172 elements)
+  - Personal Data subject types (3 subject types)
 
 ### 1. Setup Database
 
-```bash
-# Run SQL setup scripts
-databricks sql -e "$(cat sql/setup_taxonomy.sql)"
-databricks sql -e "$(cat sql/setup_governance.sql)"
-```
-
-### 2. Import CarMax Taxonomy
-
-```python
-# In a Databricks notebook
-from taxonomy_manager import TaxonomyManager
-from databricks.sdk import WorkspaceClient
-
-w = WorkspaceClient()
-taxonomy_mgr = TaxonomyManager(w)
-
-# Import from your Excel files
-result = taxonomy_mgr.import_from_excel(
-    elements_file='/path/to/Data_Element_Descriptions.xlsx',
-    subjects_file='/path/to/Personal Data_2025-11-14T14_18_26 (1).xlsx',
-    version='1.0'
-)
-
-print(f"Imported {result['elements_imported']} elements")
-print(f"Created {result['tags_created']} UC tags")
-```
-
-### 3. Deploy App
+Run SQL setup scripts to create schemas and tables:
 
 ```bash
-# Configure warehouse ID
-export WAREHOUSE_ID="your-warehouse-id"
+# Navigate to project directory
+cd ai_catalog
 
-# Deploy to dev
-databricks bundle deploy -t dev
+# Run taxonomy setup
+databricks sql -e "$(cat sql/setup_taxonomy.sql)" --warehouse-id YOUR_WAREHOUSE_ID
 
-# Get app URL
-databricks apps get carmax-classification-dev
+# Run governance setup
+databricks sql -e "$(cat sql/setup_governance.sql)" --warehouse-id YOUR_WAREHOUSE_ID
 ```
 
-### 4. Grant Permissions
+### 2. Deploy App
+
+```bash
+# Configure your Databricks profile
+databricks configure --profile e2-demo-field-eng
+
+# Deploy to dev environment
+export DATABRICKS_CONFIG_PROFILE=e2-demo-field-eng
+databricks bundle deploy -t dev --var warehouse_id="YOUR_WAREHOUSE_ID"
+
+# Start the app
+databricks apps start carmax-classification-dev --profile e2-demo-field-eng
+```
+
+### 3. Grant Permissions
+
+Get your service principal ID from the app:
+
+```bash
+databricks apps get carmax-classification-dev --profile e2-demo-field-eng | grep service_principal_client_id
+```
+
+Then grant permissions in SQL:
 
 ```sql
--- Get service principal ID from app
--- Then grant permissions:
+-- Replace <SP_ID> with your service principal ID
+GRANT USAGE, CREATE ON CATALOG main TO `<SP_ID>`;
+GRANT ALL PRIVILEGES ON SCHEMA main.carmax_taxonomy TO `<SP_ID>`;
+GRANT ALL PRIVILEGES ON SCHEMA main.carmax_governance TO `<SP_ID>`;
+GRANT ALL PRIVILEGES ON SCHEMA main.carmax_tags TO `<SP_ID>`;
 
-GRANT USAGE ON CATALOG main TO `<service-principal-id>`;
-GRANT USAGE ON SCHEMA main.carmax_taxonomy TO `<service-principal-id>`;
-GRANT USAGE ON SCHEMA main.carmax_governance TO `<service-principal-id>`;
-GRANT USAGE ON SCHEMA main.carmax_tags TO `<service-principal-id>`;
-
-GRANT ALL PRIVILEGES ON SCHEMA main.carmax_taxonomy TO `<service-principal-id>`;
-GRANT ALL PRIVILEGES ON SCHEMA main.carmax_governance TO `<service-principal-id>`;
-GRANT ALL PRIVILEGES ON SCHEMA main.carmax_tags TO `<service-principal-id>`;
+-- Grant SQL Warehouse access
+GRANT USE ON WAREHOUSE YOUR_WAREHOUSE_ID TO `<SP_ID>`;
 
 -- Grant access to catalogs you want to classify
-GRANT USAGE ON CATALOG your_catalog TO `<service-principal-id>`;
-GRANT SELECT ON CATALOG your_catalog TO `<service-principal-id>`;
-GRANT MODIFY ON CATALOG your_catalog TO `<service-principal-id>`;
+GRANT USAGE ON CATALOG your_catalog TO `<SP_ID>`;
+GRANT SELECT ON CATALOG your_catalog TO `<SP_ID>`;
+GRANT MODIFY ON CATALOG your_catalog TO `<SP_ID>`;
 ```
+
+### 4. Upload Taxonomy via UI
+
+1. **Open the app URL** (get it from `databricks apps get carmax-classification-dev`)
+2. **Go to Taxonomy tab**
+3. **Drag and drop your Excel files** or click to browse:
+   - Data Element Descriptions.xlsx
+   - Personal Data subject types.xlsx
+4. **Click Import**
+5. **Verify** - Status changes from "⚠ Taxonomy Not Initialized" to "✓ Ready (172 elements)"
+
+That's it! The app is now ready to classify your data.
 
 ---
 
@@ -96,44 +99,30 @@ GRANT MODIFY ON CATALOG your_catalog TO `<service-principal-id>`;
 
 ### Step 1: Classify Columns
 
-Via API:
-```bash
-curl -X POST http://your-app-url/api/classify \
-  -H "Content-Type: application/json" \
-  -d '{"catalog": "main", "schema": "your_schema"}'
-```
-
-Via UI:
-1. Go to "Classify" page
+In the UI:
+1. Go to **Classify** tab
 2. Select catalog and schema
 3. Click "Classify Columns"
-4. Wait for results
+4. Wait for AI classification to complete
 
 ### Step 2: Review Classifications
 
 The system auto-approves 90% of classifications. Only review pending items:
 
-- **Auto-Approved (90%)**: High confidence, no review needed
-- **Pending Review (10%)**: Low confidence or sensitive data
-
 In the UI:
-1. Go to "Review" page
-2. Filter by "High Priority" (sensitive + low confidence)
+1. Go to **Review** tab
+2. Filter by "High Priority" (sensitive data or low confidence)
 3. Approve, edit, or reject each classification
+4. Bulk approve high-confidence items
 
 ### Step 3: Apply Tags
 
 Apply approved classifications as Unity Catalog tags:
 
-Via API:
-```bash
-curl -X POST http://your-app-url/api/apply-tags
-```
-
-Via UI:
-1. Go to "Compliance" page
-2. Click "Apply Approved Classifications"
-3. Tags are applied to UC columns
+In the UI:
+1. Go to **Dashboard** tab
+2. Click "Apply Tags"
+3. Tags are automatically applied to columns
 
 ### Step 4: View in Governance Hub
 
@@ -148,18 +137,32 @@ Tags automatically appear in Databricks Governance Hub:
 
 ```
 ai_catalog/
-├── sql/
-│   ├── setup_taxonomy.sql         # Creates taxonomy schema and tables
-│   └── setup_governance.sql       # Creates governance tracking table
 ├── app/
 │   ├── main.py                    # Flask REST API
 │   ├── taxonomy_manager.py        # Excel import and taxonomy CRUD
-│   └── classification_engine.py   # Claude 3.7 classification
+│   ├── classification_engine.py   # Claude 3.7 classification
+│   ├── init_taxonomy.py           # Startup initialization
+│   └── templates/
+│       └── app.html               # Unified web UI
+├── sql/
+│   ├── setup_taxonomy.sql         # Creates taxonomy schema and tables
+│   └── setup_governance.sql       # Creates governance tracking table
+├── data/
+│   ├── Data_Element_Descriptions.xlsx      # Sample taxonomy elements
+│   └── Personal Data_*.xlsx                # Sample subject types
+├── docs/
+│   ├── DEPLOYMENT_GUIDE.md        # Detailed deployment guide
+│   ├── SOLUTION_DESIGN.md         # Architecture documentation
+│   └── *.md                       # Other documentation
+├── assets/
+│   └── CarMax-Logo_*.png          # Logo and images
 ├── resources/
-│   └── apps.yml                   # DABs app configuration
-├── databricks.yml                 # Main DABs bundle config
+│   └── apps.yml                   # Databricks App configuration
+├── static/
+│   └── app.js                     # Frontend JavaScript
+├── databricks.yml                 # DABs bundle config
+├── app.yaml                       # App entry point config
 ├── requirements.txt               # Python dependencies
-├── SOLUTION_DESIGN.md             # Complete architecture guide
 └── README.md                      # This file
 ```
 
@@ -167,26 +170,30 @@ ai_catalog/
 
 ## API Reference
 
+### Admin
+
+- `GET /api/admin/taxonomy-status` - Check if taxonomy is initialized
+- `POST /api/admin/import-taxonomy` - Upload and import Excel files
+
 ### Taxonomy
 
-- `POST /api/taxonomy/import` - Import Excel files
-- `GET /api/taxonomy` - Get current taxonomy
+- `GET /api/taxonomy` - Get current active taxonomy
 
 ### Catalogs
 
-- `GET /api/catalogs` - List catalogs
-- `GET /api/schemas?catalog=main` - List schemas
+- `GET /api/catalogs` - List accessible catalogs
+- `GET /api/schemas?catalog=main` - List schemas in catalog
 
 ### Classification
 
-- `POST /api/classify` - Classify columns
+- `POST /api/classify` - Classify columns in schema
   ```json
   {"catalog": "main", "schema": "your_schema"}
   ```
 
 - `GET /api/classifications?status=PENDING` - Get classifications
-- `POST /api/classifications/:id/approve` - Approve one
-- `POST /api/classifications/:id/reject` - Reject one
+- `POST /api/classifications/:id/approve` - Approve classification
+- `POST /api/classifications/:id/reject` - Reject classification
 - `POST /api/classifications/bulk-approve` - Bulk approve
   ```json
   {"min_confidence": 80, "exclude_sensitive": false}
@@ -198,7 +205,7 @@ ai_catalog/
 
 ### Dashboard
 
-- `GET /api/dashboard/stats` - Get statistics
+- `GET /api/dashboard/stats` - Get classification statistics
 
 ---
 
@@ -206,52 +213,45 @@ ai_catalog/
 
 ### Environment Variables
 
-Set in `resources/apps.yml`:
+Set in `app.yaml`:
 
 - `WAREHOUSE_ID` - SQL Warehouse ID (required)
 - `TARGET_CATALOG` - Default catalog (default: "main")
-- `FLASK_ENV` - Environment (dev/prod)
+- `MODEL_ENDPOINT` - Foundation model endpoint (default: "databricks-claude-3-7-sonnet")
 
-### Deployment Environments
+### Deployment Targets
 
-**Dev** (databricks bundle deploy -t dev)
+Configure in `databricks.yml`:
+
+**Dev** (`databricks bundle deploy -t dev`)
 - Catalog: `main`
 - App name: `carmax-classification-dev`
-- Debug mode: enabled
+- Workspace: e2-demo-field-eng
 
-**Prod** (databricks bundle deploy -t prod)
+**Prod** (`databricks bundle deploy -t prod`)
 - Catalog: `carmax`
 - App name: `carmax-classification`
-- Debug mode: disabled
+- Configure in databricks.yml before deploying
 
 ---
 
-## Taxonomy Management
+## Excel File Format
 
-### Update Taxonomy (Add/Edit Elements)
+### Data Elements File
 
-When CarMax updates their taxonomy:
+Required columns:
+- `Data Element Name` - Element name (e.g., "Social Security Number")
+- `Data Category` - Category (e.g., "Personal Identifiers")
+- `Sensitive_Flag` - "Yes" or "No"
+- `Description` - Optional description
+- `Data Classification` - Optional classification level
 
-1. **Option A: Re-import Excel**
-   ```python
-   taxonomy_mgr.import_from_excel(
-       elements_file='updated_file.xlsx',
-       subjects_file='subjects.xlsx',
-       version='1.1'  # Increment version
-   )
-   ```
+### Subject Types File
 
-2. **Option B: Direct database update**
-   ```sql
-   INSERT INTO main.carmax_taxonomy.data_elements
-   (element_id, element_name, element_category, sensitive_flag)
-   VALUES ('new_element', 'New Element', 'Identifiers', 'No');
-   ```
-
-3. **Option C: API (future feature)**
-   Add admin UI for taxonomy CRUD operations
-
-Changes take effect within 5 minutes (cache refresh).
+Required columns:
+- `Data Subject Type Id` - ID (e.g., "CUSTOMER")
+- `Data Subject Type Name` - Name (e.g., "Customer")
+- `Description` - Description
 
 ---
 
@@ -275,43 +275,19 @@ Changes take effect within 5 minutes (cache refresh).
 
 ---
 
-## Cost Estimate
-
-**Monthly cost: $50-100**
-
-- SQL Warehouse (serverless): $30-60
-- Claude 3.7 API: $15-30
-- Storage (Delta Lake): $5-10
-
-**Cost per 10,000 columns:** ~$10-15
-
----
-
 ## Troubleshooting
 
-### "No module named 'taxonomy_manager'"
+### App shows "Taxonomy Not Initialized"
 
-Ensure app directory structure is correct:
-```bash
-ls -la app/
-# Should show: main.py, taxonomy_manager.py, classification_engine.py
-```
+**Solution:** Upload your Excel files via the Taxonomy tab in the UI.
 
 ### "Permission denied" errors
 
-Grant permissions to service principal (see Step 4 above).
+**Solution:** Grant permissions to service principal (see Step 3 above).
 
-### "Model endpoint does not exist"
+### App not starting
 
-Check if Claude 3.7 is available:
-```bash
-databricks serving-endpoints list | grep claude
-```
-
-If not available, update `classification_engine.py`:
-```python
-self.model = "databricks-meta-llama-3-3-70b-instruct"  # Use Llama instead
-```
+**Solution:** Check warehouse permissions and ensure service principal has USE privilege.
 
 ### Tags not appearing
 
@@ -328,36 +304,34 @@ self.model = "databricks-meta-llama-3-3-70b-instruct"  # Use Llama instead
 
 ---
 
+## Documentation
+
+Detailed documentation available in `docs/`:
+
+- `DEPLOYMENT_GUIDE.md` - Complete deployment instructions
+- `SOLUTION_DESIGN.md` - Architecture and design decisions
+- `TESTING_GUIDE.md` - Testing strategies and procedures
+
+---
+
 ## Support
 
 For issues:
-1. Check `SOLUTION_DESIGN.md` for architecture details
-2. Review app logs: `databricks apps logs carmax-classification-dev`
+1. Check `docs/DEPLOYMENT_GUIDE.md` for deployment help
+2. Review `docs/SOLUTION_DESIGN.md` for architecture details
 3. Contact your Databricks account team
 
 ---
 
-## Next Steps
+## Cost Estimate
 
-1. **Test with sample data**
-   - Classify a small schema first
-   - Verify auto-approval rates
-   - Test review workflow
+**Monthly cost: $50-100**
 
-2. **Scale to production**
-   - Deploy to prod environment
-   - Classify all catalogs
-   - Monitor costs and performance
+- SQL Warehouse (serverless): $30-60
+- Claude 3.7 API: $15-30
+- Storage (Delta Lake): $5-10
 
-3. **Customize taxonomy**
-   - Add CarMax-specific patterns
-   - Adjust confidence thresholds
-   - Create custom rules
-
-4. **Integrate with governance**
-   - Create tag-based policies
-   - Setup automated reports
-   - Configure compliance dashboards
+**Cost per 10,000 columns:** ~$10-15
 
 ---
 
