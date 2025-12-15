@@ -12,11 +12,11 @@ resources:
   - name: warehouse
     description: SQL warehouse for UC operations and classification
     warehouse:
-      id: "00082b3f17294cde"
+      id: "8baced1ff014912d"
 
 env:
   - name: WAREHOUSE_ID
-    value: "00082b3f17294cde"
+    value: "8baced1ff014912d"
 
   - name: TARGET_CATALOG
     value: "main"

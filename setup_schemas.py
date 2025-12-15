@@ -9,7 +9,7 @@ import os
 def main():
     # Initialize workspace client
     w = WorkspaceClient(profile="e2-demo-field-eng")
-    warehouse_id = "00082b3f17294cde"
+    warehouse_id = "8baced1ff014912d"
 
     print("Setting up CarMax Data Classification schemas...")
 
