@@ -5,34 +5,4 @@ resources:
     carmax_classification:
       name: "carmax-classification-${var.environment}"
       description: "CarMax Data Classification Platform - ${var.environment}"
-
-      # App configuration
       source_code_path: "."
-
-      # Warehouse resource
-      resources:
-        - name: warehouse
-          warehouse:
-            id: "${var.warehouse_id}"
-
-      # Environment variables
-      env:
-        - name: WAREHOUSE_ID
-          value: "${var.warehouse_id}"
-
-        - name: TARGET_CATALOG
-          value: "${var.catalog}"
-
-        - name: FLASK_ENV
-          value: "${var.environment}"
-
-        - name: DATABRICKS_HOST
-          value: "${workspace.host}"
-
-      # Permissions (adjust as needed)
-      permissions:
-        - level: CAN_MANAGE
-          group_name: "admins"
-
-        - level: CAN_USE
-          group_name: "users"

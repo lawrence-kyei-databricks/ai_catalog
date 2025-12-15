@@ -9,8 +9,8 @@ from databricks.sdk import WorkspaceClient
 import os
 import json
 
-from taxonomy_manager import TaxonomyManager
-from classification_engine import ClassificationEngine
+from .taxonomy_manager import TaxonomyManager
+from .classification_engine import ClassificationEngine
 
 app = Flask(__name__, static_folder='../static')
 CORS(app)

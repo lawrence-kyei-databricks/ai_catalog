@@ -14,6 +14,7 @@ import json
 import re
 import hashlib
 import time
+import os
 from typing import Dict, List, Optional
 from databricks.sdk import WorkspaceClient
 from .taxonomy_manager import TaxonomyManager
@@ -27,7 +28,7 @@ class ClassificationEngine:
     def __init__(self, w: WorkspaceClient, taxonomy_manager: TaxonomyManager):
         self.w = w
         self.taxonomy_manager = taxonomy_manager
-        self.model = "databricks-claude-3-7-sonnet"
+        self.model = os.environ.get('MODEL_ENDPOINT', 'databricks-claude-3-7-sonnet')
         self.governance_schema = "main.carmax_governance"
 
         # Auto-approval thresholds

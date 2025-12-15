@@ -5,8 +5,19 @@ bundle:
 
 variables:
   warehouse_id:
-    description: "SQL Warehouse ID for queries"
-    default: "${lookup.warehouse_id}"
+    description: "SQL Warehouse ID for queries (set via env var WAREHOUSE_ID)"
+
+  model_endpoint:
+    description: "Foundation Model API endpoint"
+    default: "databricks-claude-3-7-sonnet"
+
+  catalog:
+    description: "Target catalog for deployment"
+    default: "main"
+
+  environment:
+    description: "Deployment environment (dev/prod)"
+    default: "dev"
 
 include:
   - resources/*.yml
@@ -17,7 +28,8 @@ targets:
     mode: development
     default: true
     workspace:
-      host: ${workspace.host}
+      host: https://e2-demo-field-eng.cloud.databricks.com
+      profile: e2-demo-field-eng
 
     variables:
       catalog: "main"

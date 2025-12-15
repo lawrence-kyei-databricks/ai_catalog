@@ -1,12 +1,28 @@
 # Databricks App Configuration
 # Defines entry point for CarMax Data Classification Platform
 
-command: ["python", "-m", "flask", "run", "--host=0.0.0.0", "--port=8000"]
+command:
+  - "sh"
+  - "-c"
+  - "gunicorn --bind 0.0.0.0:${DATABRICKS_APP_PORT:-8000} --workers 1 --timeout 120 app.main:app"
+
+name: carmax-classification
+
+resources:
+  - name: warehouse
+    description: SQL warehouse for UC operations and classification
+    warehouse:
+      id: "00082b3f17294cde"
 
 env:
-  - name: FLASK_APP
-    value: app/main.py
-  - name: PYTHONPATH
-    value: app
+  - name: WAREHOUSE_ID
+    value: "00082b3f17294cde"
 
-# App will receive WAREHOUSE_ID, TARGET_CATALOG, etc. from resources/apps.yml
+  - name: TARGET_CATALOG
+    value: "main"
+
+  - name: MODEL_ENDPOINT
+    value: "databricks-claude-3-7-sonnet"
+
+  - name: FLASK_ENV
+    value: "development"
