@@ -1,8 +1,5 @@
 // CarMax Data Classification Platform - Frontend Logic
 
-let elementsFile = null;
-let subjectsFile = null;
-
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     checkSystemStatus();
@@ -22,9 +19,9 @@ function switchTab(tabName) {
 
     // Load tab-specific data
     if (tabName === 'dashboard') loadDashboard();
+    if (tabName === 'taxonomy') loadTaxonomy();
     if (tabName === 'classify') loadCatalogs();
     if (tabName === 'review') loadReview();
-    if (tabName === 'taxonomy') checkTaxonomyStatus();
 }
 
 // Check system status
@@ -72,15 +69,15 @@ async function loadDashboard() {
 async function loadCatalogs() {
     try {
         const response = await fetch('/api/catalogs');
-        const catalogs = await response.json();
+        const data = await response.json();
 
         const select = document.getElementById('catalog-select');
         select.innerHTML = '<option value="">Select catalog...</option>';
 
-        catalogs.forEach(cat => {
+        data.catalogs.forEach(cat => {
             const option = document.createElement('option');
-            option.value = cat.name;
-            option.textContent = cat.name;
+            option.value = cat;
+            option.textContent = cat;
             select.appendChild(option);
         });
     } catch (error) {
@@ -95,15 +92,15 @@ async function loadSchemas() {
 
     try {
         const response = await fetch(`/api/schemas?catalog=${catalog}`);
-        const schemas = await response.json();
+        const data = await response.json();
 
         const select = document.getElementById('schema-select');
         select.innerHTML = '<option value="">Select schema...</option>';
 
-        schemas.forEach(schema => {
+        data.schemas.forEach(schema => {
             const option = document.createElement('option');
-            option.value = schema.name;
-            option.textContent = schema.name;
+            option.value = schema;
+            option.textContent = schema;
             select.appendChild(option);
         });
     } catch (error) {
@@ -153,14 +150,14 @@ async function loadReview() {
 
     try {
         const response = await fetch('/api/classifications?status=PENDING');
-        const classifications = await response.json();
+        const data = await response.json();
 
-        if (!classifications || classifications.length === 0) {
+        if (!data.items || data.items.length === 0) {
             listEl.innerHTML = '<p style="color: #64748b; text-align: center; padding: 40px;">No pending classifications</p>';
             return;
         }
 
-        listEl.innerHTML = classifications.map(c => `
+        listEl.innerHTML = data.items.map(c => `
             <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px; margin-bottom: 12px;">
                 <div style="display: flex; justify-content: space-between; align-items: start;">
                     <div>
@@ -226,115 +223,6 @@ async function checkTaxonomyStatus() {
     }
 }
 
-// File upload handling
-const fileUploadZone = document.getElementById('file-upload-zone');
-
-fileUploadZone.addEventListener('click', () => {
-    if (!elementsFile) {
-        document.getElementById('elements-file').click();
-    } else {
-        document.getElementById('subjects-file').click();
-    }
-});
-
-fileUploadZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    fileUploadZone.classList.add('dragover');
-});
-
-fileUploadZone.addEventListener('dragleave', () => {
-    fileUploadZone.classList.remove('dragover');
-});
-
-fileUploadZone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    fileUploadZone.classList.remove('dragover');
-
-    const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.xlsx') || f.name.endsWith('.xls'));
-
-    if (files.length > 0 && !elementsFile) {
-        elementsFile = files[0];
-        if (files[1]) subjectsFile = files[1];
-        updateFileDisplay();
-    }
-});
-
-function handleFileSelect() {
-    const elementsInput = document.getElementById('elements-file');
-    const subjectsInput = document.getElementById('subjects-file');
-
-    if (elementsInput.files[0]) elementsFile = elementsInput.files[0];
-    if (subjectsInput.files[0]) subjectsFile = subjectsInput.files[0];
-
-    updateFileDisplay();
-}
-
-function updateFileDisplay() {
-    const display = document.getElementById('file-names');
-    const btn = document.getElementById('upload-btn');
-
-    if (elementsFile && subjectsFile) {
-        display.innerHTML = `
-            <div>✓ Elements file: ${elementsFile.name}</div>
-            <div>✓ Subjects file: ${subjectsFile.name}</div>
-        `;
-        btn.style.display = 'block';
-    } else if (elementsFile) {
-        display.textContent = `Elements file: ${elementsFile.name} (Need: Personal Data file)`;
-        btn.style.display = 'none';
-    }
-}
-
-// Upload taxonomy
-async function uploadTaxonomy() {
-    if (!elementsFile || !subjectsFile) {
-        showMessage('taxonomy', 'error', 'Please select both files');
-        return;
-    }
-
-    const spinner = document.getElementById('taxonomy-spinner');
-    const btn = document.getElementById('upload-btn');
-
-    spinner.style.display = 'block';
-    btn.disabled = true;
-    btn.textContent = 'Importing...';
-
-    try {
-        const formData = new FormData();
-        formData.append('elements_file', elementsFile);
-        formData.append('subjects_file', subjectsFile);
-        formData.append('version', '1.0');
-
-        const response = await fetch('/api/admin/import-taxonomy', {
-            method: 'POST',
-            body: formData
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            showMessage('taxonomy', 'success', `✓ Taxonomy imported! ${data.elements_imported} elements, ${data.tags_created} tags created.`);
-            checkTaxonomyStatus();
-            checkSystemStatus();
-            loadDashboard();
-
-            // Reset
-            elementsFile = null;
-            subjectsFile = null;
-            document.getElementById('file-names').innerHTML = '';
-            btn.style.display = 'none';
-        } else {
-            showMessage('taxonomy', 'error', `Import failed: ${data.error}`);
-        }
-    } catch (error) {
-        showMessage('taxonomy', 'error', `Error: ${error.message}`);
-    } finally {
-        spinner.style.display = 'none';
-        btn.disabled = false;
-        btn.textContent = 'Import Taxonomy';
-    }
-}
-
 // Helper function to show messages
 function showMessage(tab, type, text) {
     const messageEl = document.getElementById(`${tab}-message`);
@@ -345,4 +233,298 @@ function showMessage(tab, type, text) {
     setTimeout(() => {
         messageEl.style.display = 'none';
     }, 10000);
+}
+
+// ============================================================
+// TAXONOMY MANAGEMENT FUNCTIONS
+// ============================================================
+
+let allTaxonomyElements = [];
+let currentPage = 1;
+const elementsPerPage = 20;
+
+// Load taxonomy elements
+async function loadTaxonomy(page = 1) {
+    currentPage = page;
+    const tbody = document.getElementById('taxonomy-table-body');
+
+    try {
+        const response = await fetch('/api/taxonomy/elements');
+        const data = await response.json();
+
+        allTaxonomyElements = data.elements || [];
+        renderTaxonomyTable(allTaxonomyElements);
+    } catch (error) {
+        console.error('Failed to load taxonomy:', error);
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align: center; padding: 40px; color: #ef4444;">
+                    Error loading taxonomy. Please refresh the page.
+                </td>
+            </tr>
+        `;
+    }
+}
+
+// Render taxonomy table
+function renderTaxonomyTable(elements) {
+    const tbody = document.getElementById('taxonomy-table-body');
+
+    if (!elements || elements.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align: center; padding: 40px; color: #64748b;">
+                    No data elements found. Click "Add New Element" to get started.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    // Pagination
+    const startIdx = (currentPage - 1) * elementsPerPage;
+    const endIdx = startIdx + elementsPerPage;
+    const pageElements = elements.slice(startIdx, endIdx);
+
+    tbody.innerHTML = pageElements.map(el => `
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 12px;">${el.element_name}</td>
+            <td style="padding: 12px;">${el.element_category}</td>
+            <td style="padding: 12px;">
+                <span style="
+                    background: ${el.sensitive_flag === 'Yes' ? '#fee2e2' : '#dcfce7'};
+                    color: ${el.sensitive_flag === 'Yes' ? '#991b1b' : '#15803d'};
+                    padding: 4px 12px;
+                    border-radius: 12px;
+                    font-size: 12px;
+                    font-weight: 600;
+                ">${el.sensitive_flag}</span>
+            </td>
+            <td style="padding: 12px; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                ${el.element_description || '-'}
+            </td>
+            <td style="padding: 12px;">
+                <div style="display: flex; gap: 8px; white-space: nowrap;">
+                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;" onclick="editElement('${el.element_id}')">Edit</button>
+                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px; background: #fee2e2; color: #991b1b;" onclick="deleteElement('${el.element_id}')">Delete</button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+
+    // Update pagination
+    renderPagination(elements.length);
+}
+
+// Render pagination
+function renderPagination(totalElements) {
+    const paginationEl = document.getElementById('taxonomy-pagination');
+    const totalPages = Math.ceil(totalElements / elementsPerPage);
+
+    if (totalPages <= 1) {
+        paginationEl.innerHTML = '';
+        return;
+    }
+
+    let html = '';
+
+    // Previous button
+    if (currentPage > 1) {
+        html += `<button class="btn btn-secondary" onclick="loadTaxonomy(${currentPage - 1})">Previous</button>`;
+    }
+
+    // Page numbers
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === currentPage) {
+            html += `<button class="btn btn-primary" style="padding: 8px 12px;">${i}</button>`;
+        } else if (i === 1 || i === totalPages || Math.abs(i - currentPage) <= 2) {
+            html += `<button class="btn btn-secondary" onclick="loadTaxonomy(${i})">${i}</button>`;
+        } else if (Math.abs(i - currentPage) === 3) {
+            html += `<span style="padding: 8px;">...</span>`;
+        }
+    }
+
+    // Next button
+    if (currentPage < totalPages) {
+        html += `<button class="btn btn-secondary" onclick="loadTaxonomy(${currentPage + 1})">Next</button>`;
+    }
+
+    paginationEl.innerHTML = html;
+}
+
+// Filter taxonomy
+function filterTaxonomy() {
+    const searchTerm = document.getElementById('taxonomy-search').value.toLowerCase();
+
+    if (!searchTerm) {
+        renderTaxonomyTable(allTaxonomyElements);
+        return;
+    }
+
+    const filtered = allTaxonomyElements.filter(el =>
+        el.element_name.toLowerCase().includes(searchTerm) ||
+        el.element_category.toLowerCase().includes(searchTerm) ||
+        (el.element_description && el.element_description.toLowerCase().includes(searchTerm))
+    );
+
+    currentPage = 1;
+    renderTaxonomyTable(filtered);
+}
+
+// Show add element form
+function showAddElementForm() {
+    document.getElementById('add-element-form').style.display = 'block';
+    document.getElementById('new-element-name').value = '';
+    document.getElementById('new-element-category').value = '';
+    document.getElementById('new-element-sensitive').value = 'No';
+    document.getElementById('new-element-description').value = '';
+}
+
+// Cancel add element
+function cancelAddElement() {
+    document.getElementById('add-element-form').style.display = 'none';
+}
+
+// Save new element
+async function saveNewElement() {
+    const name = document.getElementById('new-element-name').value.trim();
+    const category = document.getElementById('new-element-category').value.trim();
+    const sensitive = document.getElementById('new-element-sensitive').value;
+    const description = document.getElementById('new-element-description').value.trim();
+
+    if (!name || !category) {
+        showMessage('taxonomy', 'error', 'Element name and category are required');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/taxonomy/elements', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                element_name: name,
+                element_category: category,
+                sensitive_flag: sensitive,
+                element_description: description
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showMessage('taxonomy', 'success', 'Element added successfully!');
+            cancelAddElement();
+            loadTaxonomy();
+            checkSystemStatus();
+        } else {
+            showMessage('taxonomy', 'error', data.error || 'Failed to add element');
+        }
+    } catch (error) {
+        showMessage('taxonomy', 'error', `Error: ${error.message}`);
+    }
+}
+
+// Edit element - show modal
+let currentEditElementId = null;
+
+function editElement(elementId) {
+    const element = allTaxonomyElements.find(el => el.element_id === elementId);
+    if (!element) return;
+
+    currentEditElementId = elementId;
+
+    // Populate modal fields
+    document.getElementById('edit-element-name').value = element.element_name;
+    document.getElementById('edit-element-category').value = element.element_category;
+    document.getElementById('edit-element-sensitive').value = element.sensitive_flag;
+    document.getElementById('edit-element-description').value = element.element_description || '';
+
+    // Show modal
+    const modal = document.getElementById('edit-modal');
+    modal.style.display = 'flex';
+}
+
+function closeEditModal() {
+    document.getElementById('edit-modal').style.display = 'none';
+    currentEditElementId = null;
+}
+
+async function saveEditElement() {
+    if (!currentEditElementId) return;
+
+    const newName = document.getElementById('edit-element-name').value.trim();
+    const newCategory = document.getElementById('edit-element-category').value.trim();
+    const newSensitive = document.getElementById('edit-element-sensitive').value;
+    const newDescription = document.getElementById('edit-element-description').value.trim();
+
+    if (!newName || !newCategory) {
+        showMessage('taxonomy', 'error', 'Name and category are required');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/taxonomy/elements/${currentEditElementId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                element_name: newName,
+                element_category: newCategory,
+                sensitive_flag: newSensitive,
+                element_description: newDescription
+            })
+        });
+
+        if (response.ok) {
+            showMessage('taxonomy', 'success', 'Element updated successfully!');
+            closeEditModal();
+            loadTaxonomy();
+        } else {
+            const data = await response.json();
+            showMessage('taxonomy', 'error', data.error || 'Failed to update element');
+        }
+    } catch (error) {
+        showMessage('taxonomy', 'error', `Error: ${error.message}`);
+    }
+}
+
+// Delete element - show modal
+let currentDeleteElementId = null;
+
+function deleteElement(elementId) {
+    const element = allTaxonomyElements.find(el => el.element_id === elementId);
+    if (!element) return;
+
+    currentDeleteElementId = elementId;
+    document.getElementById('delete-element-name').textContent = element.element_name;
+
+    // Show modal
+    const modal = document.getElementById('delete-modal');
+    modal.style.display = 'flex';
+}
+
+function closeDeleteModal() {
+    document.getElementById('delete-modal').style.display = 'none';
+    currentDeleteElementId = null;
+}
+
+async function confirmDeleteElement() {
+    if (!currentDeleteElementId) return;
+
+    try {
+        const response = await fetch(`/api/taxonomy/elements/${currentDeleteElementId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            showMessage('taxonomy', 'success', 'Element deleted successfully!');
+            closeDeleteModal();
+            loadTaxonomy();
+            checkSystemStatus();
+        } else {
+            const data = await response.json();
+            showMessage('taxonomy', 'error', data.error || 'Failed to delete element');
+        }
+    } catch (error) {
+        showMessage('taxonomy', 'error', `Error: ${error.message}`);
+    }
 }

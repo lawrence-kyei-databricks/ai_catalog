@@ -83,6 +83,116 @@ def get_taxonomy():
 
 
 # ========================================
+# TAXONOMY CRUD ENDPOINTS
+# ========================================
+
+@app.route('/api/taxonomy/elements', methods=['GET'])
+def list_taxonomy_elements():
+    """List all taxonomy elements"""
+    try:
+        sql = """
+        SELECT element_id, element_name, element_category, element_description,
+               sensitive_flag, active, created_at
+        FROM main.carmax_taxonomy.data_elements
+        WHERE active IS NULL OR active = TRUE
+        ORDER BY element_category, element_name
+        """
+        elements = _execute_sql(sql)
+        return jsonify({'elements': elements or []})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/taxonomy/elements', methods=['POST'])
+def create_taxonomy_element():
+    """Create a new taxonomy element"""
+    try:
+        data = request.json
+
+        # Validate required fields
+        if not data.get('element_name') or not data.get('element_category'):
+            return jsonify({'error': 'element_name and element_category are required'}), 400
+
+        # Generate element_id from name
+        element_id = data['element_name'].lower().replace(' ', '_').replace('-', '_')
+
+        # Check if element already exists
+        check_sql = f"SELECT COUNT(*) as cnt FROM main.carmax_taxonomy.data_elements WHERE element_id = '{element_id}'"
+        result = _execute_sql(check_sql)
+        if result and int(result[0]['cnt']) > 0:
+            return jsonify({'error': 'Element with this name already exists'}), 409
+
+        # Insert new element
+        sql = f"""
+        INSERT INTO main.carmax_taxonomy.data_elements
+        (element_id, element_name, element_category, element_description, sensitive_flag, active, created_at)
+        VALUES (
+            '{element_id}',
+            {_quote(data['element_name'])},
+            {_quote(data['element_category'])},
+            {_quote(data.get('element_description', ''))},
+            '{data.get('sensitive_flag', 'No')}',
+            TRUE,
+            CURRENT_TIMESTAMP()
+        )
+        """
+        _execute_sql(sql)
+
+        return jsonify({'success': True, 'element_id': element_id}), 201
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/taxonomy/elements/<element_id>', methods=['PUT'])
+def update_taxonomy_element(element_id):
+    """Update a taxonomy element"""
+    try:
+        data = request.json
+
+        # Validate required fields
+        if not data.get('element_name') or not data.get('element_category'):
+            return jsonify({'error': 'element_name and element_category are required'}), 400
+
+        # Update element
+        sql = f"""
+        UPDATE main.carmax_taxonomy.data_elements
+        SET
+            element_name = {_quote(data['element_name'])},
+            element_category = {_quote(data['element_category'])},
+            element_description = {_quote(data.get('element_description', ''))},
+            sensitive_flag = '{data.get('sensitive_flag', 'No')}',
+            updated_at = CURRENT_TIMESTAMP()
+        WHERE element_id = '{element_id}'
+        """
+        _execute_sql(sql)
+
+        return jsonify({'success': True})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/taxonomy/elements/<element_id>', methods=['DELETE'])
+def delete_taxonomy_element(element_id):
+    """Delete a taxonomy element (soft delete)"""
+    try:
+        # Soft delete by setting active = FALSE
+        sql = f"""
+        UPDATE main.carmax_taxonomy.data_elements
+        SET active = FALSE, updated_at = CURRENT_TIMESTAMP()
+        WHERE element_id = '{element_id}'
+        """
+        _execute_sql(sql)
+
+        return jsonify({'success': True})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ========================================
 # ADMIN ENDPOINTS
 # ========================================
 
@@ -126,16 +236,22 @@ def taxonomy_status():
 def admin_import_taxonomy():
     """Handle file upload and import taxonomy"""
     try:
+        print("[import-taxonomy] Starting taxonomy import...")
+
         # Check if files were uploaded
         if 'elements_file' not in request.files or 'subjects_file' not in request.files:
+            print("[import-taxonomy] ERROR: Missing files in request")
             return jsonify({'success': False, 'error': 'Both files are required'}), 400
 
         elements_file = request.files['elements_file']
         subjects_file = request.files['subjects_file']
         version = request.form.get('version', '1.0')
 
+        print(f"[import-taxonomy] Files received: {elements_file.filename}, {subjects_file.filename}")
+
         # Validate files
         if elements_file.filename == '' or subjects_file.filename == '':
+            print("[import-taxonomy] ERROR: Empty filenames")
             return jsonify({'success': False, 'error': 'No files selected'}), 400
 
         # Save files temporarily
@@ -143,15 +259,21 @@ def admin_import_taxonomy():
             elements_path = os.path.join(tmpdir, secure_filename(elements_file.filename))
             subjects_path = os.path.join(tmpdir, secure_filename(subjects_file.filename))
 
+            print(f"[import-taxonomy] Saving files to temp: {elements_path}, {subjects_path}")
             elements_file.save(elements_path)
             subjects_file.save(subjects_path)
 
             # Import taxonomy
+            print("[import-taxonomy] Calling taxonomy_mgr.import_from_excel...")
             result = taxonomy_mgr.import_from_excel(elements_path, subjects_path, version)
 
+            print(f"[import-taxonomy] Import successful: {result}")
             return jsonify({'success': True, **result})
 
     except Exception as e:
+        print(f"[import-taxonomy] ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -513,6 +635,15 @@ def _get_unclassified_columns(catalog, schema):
     """
 
     return _execute_sql(sql)
+
+
+def _quote(value):
+    """Quote a string value for SQL, handling None and escaping single quotes"""
+    if value is None or value == '':
+        return 'NULL'
+    # Escape single quotes by doubling them
+    escaped = str(value).replace("'", "''")
+    return f"'{escaped}'"
 
 
 def _execute_sql(sql):

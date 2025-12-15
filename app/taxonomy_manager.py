@@ -54,6 +54,19 @@ class TaxonomyManager:
         subjects_df = pd.read_excel(subjects_file)
 
         print(f"[TaxonomyManager] Loaded {len(elements_df)} elements, {len(subjects_df)} subject types")
+        print(f"[TaxonomyManager] Elements file columns: {list(elements_df.columns)}")
+        print(f"[TaxonomyManager] Subjects file columns: {list(subjects_df.columns)}")
+
+        # Validate required columns
+        required_element_cols = ['Data Element Name', 'Data Category', 'Sensitive_Flag']
+        missing_element_cols = [col for col in required_element_cols if col not in elements_df.columns]
+        if missing_element_cols:
+            raise ValueError(f"Elements file missing required columns: {missing_element_cols}. Found columns: {list(elements_df.columns)}")
+
+        required_subject_cols = ['Data Subject Type Id', 'Data Subject Type Name', 'Description']
+        missing_subject_cols = [col for col in required_subject_cols if col not in subjects_df.columns]
+        if missing_subject_cols:
+            raise ValueError(f"Subjects file missing required columns: {missing_subject_cols}. Found columns: {list(subjects_df.columns)}")
 
         # 2. Load Data Elements (172 rows)
         loaded_count = self._import_elements(elements_df)
