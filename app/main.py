@@ -33,7 +33,7 @@ classifier = ClassificationEngine(w, taxonomy_mgr)
 # Auto-initialize taxonomy on startup
 try:
     print("Checking taxonomy initialization...")
-    init_result = init_taxonomy()
+    init_result = init_taxonomy(warehouse_id=WAREHOUSE_ID)
     print(f"Taxonomy initialization result: {init_result}")
 except Exception as e:
     print(f"Warning: Could not auto-initialize taxonomy: {e}")

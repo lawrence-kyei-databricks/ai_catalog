@@ -8,13 +8,18 @@ from databricks.sdk import WorkspaceClient
 from .taxonomy_manager import TaxonomyManager
 
 
-def init_taxonomy():
+def init_taxonomy(warehouse_id: str = None):
     """
     Initialize taxonomy from Excel files if not already loaded
     This runs automatically on app startup
+
+    Args:
+        warehouse_id: SQL warehouse ID (optional, falls back to environment variable)
     """
     try:
-        warehouse_id = os.environ.get('WAREHOUSE_ID')
+        if not warehouse_id:
+            warehouse_id = os.environ.get('WAREHOUSE_ID')
+
         w = WorkspaceClient()
         taxonomy_mgr = TaxonomyManager(w, warehouse_id=warehouse_id)
 
