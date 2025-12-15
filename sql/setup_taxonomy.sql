@@ -30,10 +30,10 @@ CREATE TABLE IF NOT EXISTS main.carmax_taxonomy.data_elements (
   metadata STRING COMMENT 'JSON metadata for extensibility',
 
   -- Lifecycle
-  active BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
-  created_by STRING DEFAULT CURRENT_USER()
+  active BOOLEAN,
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP,
+  created_by STRING
 )
 USING DELTA
 TBLPROPERTIES (
@@ -49,9 +49,9 @@ CREATE TABLE IF NOT EXISTS main.carmax_taxonomy.data_categories (
   category_id STRING PRIMARY KEY,
   category_name STRING NOT NULL,
   category_description STRING,
-  element_count INT DEFAULT 0,
-  active BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+  element_count INT,
+  active BOOLEAN,
+  created_at TIMESTAMP
 )
 USING DELTA
 COMMENT 'CarMax Data Categories (14 categories)';
@@ -63,8 +63,8 @@ CREATE TABLE IF NOT EXISTS main.carmax_taxonomy.subject_types (
   subject_type_id STRING PRIMARY KEY,
   subject_type_name STRING NOT NULL,
   subject_description STRING,
-  active BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+  active BOOLEAN,
+  created_at TIMESTAMP
 )
 USING DELTA
 COMMENT 'CarMax Data Subject Types (Associate, B2B, Consumer)';
@@ -79,8 +79,8 @@ CREATE TABLE IF NOT EXISTS main.carmax_taxonomy.taxonomy_versions (
   change_description STRING,
   element_count INT,
   changes_json STRING COMMENT 'JSON: {added: [], removed: [], updated: []}',
-  changed_by STRING DEFAULT CURRENT_USER(),
-  changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+  changed_by STRING,
+  changed_at TIMESTAMP
 )
 USING DELTA
 COMMENT 'Taxonomy change history and audit trail';
@@ -93,8 +93,8 @@ CREATE TABLE IF NOT EXISTS main.carmax_taxonomy.element_mappings (
   old_element_name STRING NOT NULL,
   new_element_name STRING NOT NULL,
   mapping_reason STRING,
-  effective_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+  effective_date TIMESTAMP,
+  created_at TIMESTAMP
 )
 USING DELTA
 COMMENT 'Track element name changes for backward compatibility';

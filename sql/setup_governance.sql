@@ -30,11 +30,11 @@ CREATE TABLE IF NOT EXISTS main.carmax_governance.classification_governance (
   reasoning STRING,
 
   -- Auto-approval intelligence
-  review_status STRING DEFAULT 'PENDING' CHECK (
+  review_status STRING CHECK (
     review_status IN ('PENDING', 'AUTO_APPROVED', 'APPROVED', 'REJECTED', 'APPLIED')
   ),
   approval_tier INT CHECK (approval_tier IN (1, 2, 3)),
-  requires_review BOOLEAN DEFAULT TRUE,
+  requires_review BOOLEAN,
   review_priority STRING CHECK (review_priority IN ('HIGH', 'MEDIUM', 'LOW')),
 
   -- Human review
@@ -43,13 +43,13 @@ CREATE TABLE IF NOT EXISTS main.carmax_governance.classification_governance (
   review_notes STRING,
 
   -- Timestamps
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
+  created_at TIMESTAMP,
   reviewed_at TIMESTAMP,
   applied_at TIMESTAMP,
 
   -- Metadata
   sample_values STRING COMMENT 'JSON array of sample values',
-  model_used STRING DEFAULT 'databricks-claude-3-7-sonnet',
+  model_used STRING,
   classification_source STRING CHECK (
     classification_source IN ('CLAUDE', 'UC_NATIVE', 'PATTERN_RULE', 'CACHE', 'MANUAL')
   ),
@@ -79,12 +79,12 @@ CREATE TABLE IF NOT EXISTS main.carmax_governance.classification_queue (
   table_name STRING NOT NULL,
   column_name STRING NOT NULL,
 
-  status STRING DEFAULT 'QUEUED' CHECK (
+  status STRING CHECK (
     status IN ('QUEUED', 'PROCESSING', 'COMPLETED', 'FAILED')
   ),
-  priority INT DEFAULT 5 CHECK (priority >= 1 AND priority <= 10),
+  priority INT CHECK (priority >= 1 AND priority <= 10),
 
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
+  created_at TIMESTAMP,
   started_at TIMESTAMP,
   completed_at TIMESTAMP,
   error_message STRING
