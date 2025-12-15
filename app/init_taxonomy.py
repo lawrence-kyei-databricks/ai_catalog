@@ -14,8 +14,9 @@ def init_taxonomy():
     This runs automatically on app startup
     """
     try:
+        warehouse_id = os.environ.get('WAREHOUSE_ID')
         w = WorkspaceClient()
-        taxonomy_mgr = TaxonomyManager(w)
+        taxonomy_mgr = TaxonomyManager(w, warehouse_id=warehouse_id)
 
         # Check if taxonomy tables exist and are initialized
         try:
