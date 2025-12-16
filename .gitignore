@@ -10,3 +10,6 @@ static/CarMax-Logo_YellowBox_HEX.png
 
 # Data files (keep local only, do not commit)
 data/
+
+# macOS system files
+.DS_Store
