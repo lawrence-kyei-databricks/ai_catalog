@@ -31,7 +31,10 @@ class ClassificationEngine:
         self.taxonomy_manager = taxonomy_manager
         self.warehouse_id = os.environ.get('WAREHOUSE_ID')
         self.model = os.environ.get('MODEL_ENDPOINT', 'databricks-claude-3-7-sonnet')
-        self.governance_schema = "main.carmax_governance"
+
+        # Use environment variable for schema name, defaulting to carmax for backward compatibility
+        org_name = os.environ.get('ORG_NAME', 'carmax')
+        self.governance_schema = f"main.{org_name}_governance"
 
         # Auto-approval thresholds
         self.TIER1_CONFIDENCE = 95  # Auto-approve immediately

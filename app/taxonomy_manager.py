@@ -70,11 +70,19 @@ class TaxonomyManager:
         if missing_subject_cols:
             raise ValueError(f"Subjects file missing required columns: {missing_subject_cols}. Found columns: {list(subjects_df.columns)}")
 
+        # Track errors for partial import failures
+        errors = []
+
         # 2. Load Data Elements (172 rows)
-        loaded_count = self._import_elements(elements_df)
+        elements_result = self._import_elements(elements_df)
+        loaded_count = elements_result['success']
+        if elements_result['errors']:
+            errors.extend(elements_result['errors'])
 
         # 3. Load Subject Types (3 rows)
-        self._import_subjects(subjects_df)
+        subjects_result = self._import_subjects(subjects_df)
+        if subjects_result['errors']:
+            errors.extend(subjects_result['errors'])
 
         # 4. Update categories
         self._update_categories(elements_df)
@@ -86,20 +94,34 @@ class TaxonomyManager:
         # 6. Sync UC tags
         tags_created = self._sync_uc_tags()
 
-        print(f"[TaxonomyManager] ✓ Import complete: {loaded_count} elements, {tags_created} tags")
+        # Log summary including any errors
+        if errors:
+            print(f"[TaxonomyManager] ⚠ Import completed with {len(errors)} errors")
+            for error in errors[:5]:  # Show first 5 errors
+                print(f"  - {error}")
+            if len(errors) > 5:
+                print(f"  ... and {len(errors) - 5} more errors")
+        else:
+            print(f"[TaxonomyManager] ✓ Import complete: {loaded_count} elements, {tags_created} tags")
 
         return {
             'elements_imported': loaded_count,
-            'subjects_imported': len(subjects_df),
+            'elements_failed': elements_result['failed'],
+            'subjects_imported': subjects_result['success'],
+            'subjects_failed': subjects_result['failed'],
             'tags_created': tags_created,
             'version': version,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now().isoformat(),
+            'errors': errors if errors else None,
+            'success': len(errors) == 0
         }
 
-    def _import_elements(self, elements_df: pd.DataFrame) -> int:
+    def _import_elements(self, elements_df: pd.DataFrame) -> Dict:
         """Import data elements from DataFrame"""
 
         loaded = 0
+        failed = 0
+        errors = []
 
         for _, row in elements_df.iterrows():
             element_id = self._generate_element_id(row['Data Element Name'])
@@ -144,14 +166,27 @@ class TaxonomyManager:
                 self._execute_sql(sql)
                 loaded += 1
             except Exception as e:
+                failed += 1
+                error_msg = f"Element '{element_name}': {str(e)[:100]}"
+                errors.append(error_msg)
                 print(f"[TaxonomyManager] Error loading element '{element_name}': {e}")
 
-        return loaded
+        return {
+            'success': loaded,
+            'failed': failed,
+            'errors': errors
+        }
 
-    def _import_subjects(self, subjects_df: pd.DataFrame):
+    def _import_subjects(self, subjects_df: pd.DataFrame) -> Dict:
         """Import subject types from DataFrame"""
 
+        loaded = 0
+        failed = 0
+        errors = []
+
         for _, row in subjects_df.iterrows():
+            subject_name = row['Data Subject Type Name']
+
             sql = f"""
             MERGE INTO {self.taxonomy_schema}.subject_types AS target
             USING (
@@ -171,7 +206,20 @@ class TaxonomyManager:
                      source.subject_description)
             """
 
-            self._execute_sql(sql)
+            try:
+                self._execute_sql(sql)
+                loaded += 1
+            except Exception as e:
+                failed += 1
+                error_msg = f"Subject '{subject_name}': {str(e)[:100]}"
+                errors.append(error_msg)
+                print(f"[TaxonomyManager] Error loading subject '{subject_name}': {e}")
+
+        return {
+            'success': loaded,
+            'failed': failed,
+            'errors': errors
+        }
 
     def _update_categories(self, elements_df: pd.DataFrame):
         """Extract and update unique categories"""

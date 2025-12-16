@@ -25,7 +25,8 @@ def init_taxonomy(warehouse_id: str = None):
 
         # Check if taxonomy tables exist and are initialized
         try:
-            check_sql = "SELECT COUNT(*) as cnt FROM main.carmax_taxonomy.data_elements"
+            # Use dynamic schema name from TaxonomyManager
+            check_sql = f"SELECT COUNT(*) as cnt FROM {taxonomy_mgr.taxonomy_schema}.data_elements"
             result = taxonomy_mgr._execute_sql(check_sql)
 
             if result and len(result) > 0:

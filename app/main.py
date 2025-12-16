@@ -1,5 +1,5 @@
 """
-CarMax Data Classification Platform - Flask API
+Data Classification Platform - Flask API
 Simple, clean backend for classification workflow
 """
 
@@ -19,9 +19,59 @@ from .init_taxonomy import init_taxonomy
 app = Flask(__name__, static_folder='../static', template_folder='templates')
 CORS(app)
 
-# Configuration
-WAREHOUSE_ID = os.environ.get('WAREHOUSE_ID')
+# ========================================
+# SECURITY HELPERS
+# ========================================
+
+import re
+
+def sanitize_sql_identifier(identifier: str) -> str:
+    """
+    Sanitize SQL identifiers (catalog, schema, table, column names) to prevent SQL injection.
+    Only allows alphanumeric characters, underscores, and hyphens.
+    """
+    if not identifier:
+        raise ValueError("Identifier cannot be empty")
+
+    # Only allow alphanumeric, underscore, and hyphen
+    if not re.match(r'^[a-zA-Z0-9_-]+$', identifier):
+        raise ValueError(f"Invalid identifier: {identifier}. Only alphanumeric, underscore, and hyphen allowed.")
+
+    return identifier
+
+def sanitize_sql_string(value: str) -> str:
+    """
+    Sanitize SQL string values to prevent SQL injection.
+    Escapes single quotes by doubling them.
+    """
+    if value is None:
+        return 'NULL'
+    return str(value).replace("'", "''")
+
+def validate_enum_value(value: str, allowed_values: list, param_name: str) -> str:
+    """
+    Validate that a value is in a whitelist of allowed values.
+    """
+    if value not in allowed_values:
+        raise ValueError(f"Invalid {param_name}: {value}. Allowed values: {', '.join(allowed_values)}")
+    return value
+
+# Configuration - Validate required environment variables
+REQUIRED_ENV_VARS = ['WAREHOUSE_ID']
+missing_vars = [var for var in REQUIRED_ENV_VARS if not os.environ.get(var)]
+if missing_vars:
+    raise RuntimeError(
+        f"Missing required environment variables: {', '.join(missing_vars)}\n"
+        f"Please set these before starting the application."
+    )
+
+WAREHOUSE_ID = os.environ['WAREHOUSE_ID']
 TARGET_CATALOG = os.environ.get('TARGET_CATALOG', 'main')
+ORG_NAME = os.environ.get('ORG_NAME', 'carmax')
+
+# Schema names based on organization
+TAXONOMY_SCHEMA = f"main.{ORG_NAME}_taxonomy"
+GOVERNANCE_SCHEMA = f"main.{ORG_NAME}_governance"
 
 # Initialize Databricks client
 w = WorkspaceClient()
@@ -90,10 +140,10 @@ def get_taxonomy():
 def list_taxonomy_elements():
     """List all taxonomy elements"""
     try:
-        sql = """
+        sql = f"""
         SELECT element_id, element_name, element_category, element_description,
                sensitive_flag, active, created_at
-        FROM main.carmax_taxonomy.data_elements
+        FROM {TAXONOMY_SCHEMA}.data_elements
         WHERE active IS NULL OR active = TRUE
         ORDER BY element_category, element_name
         """
@@ -118,14 +168,14 @@ def create_taxonomy_element():
         element_id = data['element_name'].lower().replace(' ', '_').replace('-', '_')
 
         # Check if element already exists
-        check_sql = f"SELECT COUNT(*) as cnt FROM main.carmax_taxonomy.data_elements WHERE element_id = '{element_id}'"
+        check_sql = f"SELECT COUNT(*) as cnt FROM {TAXONOMY_SCHEMA}.data_elements WHERE element_id = '{element_id}'"
         result = _execute_sql(check_sql)
         if result and int(result[0]['cnt']) > 0:
             return jsonify({'error': 'Element with this name already exists'}), 409
 
         # Insert new element
         sql = f"""
-        INSERT INTO main.carmax_taxonomy.data_elements
+        INSERT INTO {TAXONOMY_SCHEMA}.data_elements
         (element_id, element_name, element_category, element_description, sensitive_flag, active, created_at)
         VALUES (
             '{element_id}',
@@ -157,7 +207,7 @@ def update_taxonomy_element(element_id):
 
         # Update element
         sql = f"""
-        UPDATE main.carmax_taxonomy.data_elements
+        UPDATE {TAXONOMY_SCHEMA}.data_elements
         SET
             element_name = {_quote(data['element_name'])},
             element_category = {_quote(data['element_category'])},
@@ -180,7 +230,7 @@ def delete_taxonomy_element(element_id):
     try:
         # Soft delete by setting active = FALSE
         sql = f"""
-        UPDATE main.carmax_taxonomy.data_elements
+        UPDATE {TAXONOMY_SCHEMA}.data_elements
         SET active = FALSE, updated_at = CURRENT_TIMESTAMP()
         WHERE element_id = '{element_id}'
         """
@@ -200,7 +250,7 @@ def delete_taxonomy_element(element_id):
 def taxonomy_status():
     """Check if taxonomy is initialized"""
     try:
-        check_sql = "SELECT COUNT(*) as cnt FROM main.carmax_taxonomy.data_elements WHERE active IS NULL OR active = TRUE"
+        check_sql = f"SELECT COUNT(*) as cnt FROM {TAXONOMY_SCHEMA}.data_elements WHERE active IS NULL OR active = TRUE"
         result = _execute_sql(check_sql)
 
         if result and len(result) > 0:
@@ -209,7 +259,7 @@ def taxonomy_status():
 
             if element_count > 0:
                 # Get additional stats - count applied classifications (actual UC tags)
-                tags_sql = "SELECT COUNT(*) as cnt FROM main.carmax_governance.classification_governance WHERE review_status = 'APPLIED'"
+                tags_sql = f"SELECT COUNT(*) as cnt FROM {GOVERNANCE_SCHEMA}.classification_governance WHERE review_status = 'APPLIED'"
                 try:
                     tags_result = _execute_sql(tags_sql)
                     tags_count = int(tags_result[0]['cnt']) if tags_result and len(tags_result) > 0 else 0
@@ -217,7 +267,7 @@ def taxonomy_status():
                     # Governance table might not exist yet
                     tags_count = 0
 
-                subjects_sql = "SELECT COUNT(*) as cnt FROM main.carmax_taxonomy.subject_types"
+                subjects_sql = f"SELECT COUNT(*) as cnt FROM {TAXONOMY_SCHEMA}.subject_types"
                 subjects_result = _execute_sql(subjects_sql)
                 subjects_count = int(subjects_result[0]['cnt']) if subjects_result and len(subjects_result) > 0 else 0
 
@@ -336,6 +386,11 @@ def list_columns():
         if not schema or not table:
             return jsonify({'error': 'Schema and table required'}), 400
 
+        # Sanitize inputs to prevent SQL injection
+        catalog = sanitize_sql_identifier(catalog)
+        schema = sanitize_sql_identifier(schema)
+        table = sanitize_sql_identifier(table)
+
         # Get columns from information schema
         sql = f"""
         SELECT
@@ -353,6 +408,8 @@ def list_columns():
         columns = _execute_sql(sql)
         return jsonify({'columns': columns})
 
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -416,6 +473,10 @@ def get_classifications():
         priority = request.args.get('priority')
         limit = int(request.args.get('limit', 100))
 
+        # Validate status against allowed values
+        allowed_statuses = ['PENDING', 'APPROVED', 'REJECTED', 'AUTO_APPROVED', 'APPLIED']
+        status = validate_enum_value(status, allowed_statuses, 'status')
+
         # Build query
         # Handle NULL review_status for pending records
         if status == 'PENDING':
@@ -424,6 +485,9 @@ def get_classifications():
             where_clauses = [f"review_status = '{status}'"]
 
         if priority:
+            # Validate priority against allowed values
+            allowed_priorities = ['HIGH', 'MEDIUM', 'LOW']
+            priority = validate_enum_value(priority, allowed_priorities, 'priority')
             where_clauses.append(f"review_priority = '{priority}'")
 
         where_clause = ' AND '.join(where_clauses)
@@ -446,7 +510,7 @@ def get_classifications():
             reasoning,
             sample_values,
             created_at
-        FROM main.carmax_governance.classification_governance
+        FROM {GOVERNANCE_SCHEMA}.classification_governance
         WHERE {where_clause}
         ORDER BY
             CASE review_priority
@@ -465,6 +529,8 @@ def get_classifications():
             'items': results
         })
 
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -476,7 +542,7 @@ def approve_classification(id):
         notes = request.json.get('notes', '')
 
         sql = f"""
-        UPDATE main.carmax_governance.classification_governance
+        UPDATE {GOVERNANCE_SCHEMA}.classification_governance
         SET
             review_status = 'APPROVED',
             approved_element = suggested_element,
@@ -501,7 +567,7 @@ def reject_classification(id):
         reason = request.json.get('reason', '')
 
         sql = f"""
-        UPDATE main.carmax_governance.classification_governance
+        UPDATE {GOVERNANCE_SCHEMA}.classification_governance
         SET
             review_status = 'REJECTED',
             reviewer = current_user(),
@@ -531,7 +597,7 @@ def update_classification_element(id):
         # Get the element's category from taxonomy
         element_query = f"""
         SELECT element_name, element_category, sensitive_flag
-        FROM main.carmax_taxonomy.data_elements
+        FROM {TAXONOMY_SCHEMA}.data_elements
         WHERE element_name = '{new_element.replace("'", "''")}'
         AND active = TRUE
         LIMIT 1
@@ -548,7 +614,7 @@ def update_classification_element(id):
         # Update the classification with new element
         # Set status back to PENDING if it was already approved, so it needs re-review
         sql = f"""
-        UPDATE main.carmax_governance.classification_governance
+        UPDATE {GOVERNANCE_SCHEMA}.classification_governance
         SET
             suggested_element = '{new_element.replace("'", "''")}',
             suggested_category = '{element_category.replace("'", "''")}',
@@ -599,7 +665,7 @@ def bulk_approve():
         where_clause = ' AND '.join(conditions)
 
         sql = f"""
-        UPDATE main.carmax_governance.classification_governance
+        UPDATE {GOVERNANCE_SCHEMA}.classification_governance
         SET
             review_status = 'APPROVED',
             approved_element = suggested_element,
@@ -629,7 +695,7 @@ def apply_tags():
     """Apply approved classifications as UC column tags using SQL ALTER TABLE"""
     try:
         # Get approved classifications with valid elements
-        sql = """
+        sql = f"""
         SELECT
             id,
             catalog_name,
@@ -637,7 +703,7 @@ def apply_tags():
             table_name,
             column_name,
             COALESCE(approved_element, suggested_element) as element
-        FROM main.carmax_governance.classification_governance
+        FROM {GOVERNANCE_SCHEMA}.classification_governance
         WHERE review_status IN ('APPROVED', 'AUTO_APPROVED')
           AND applied_at IS NULL
           AND COALESCE(approved_element, suggested_element) IS NOT NULL
@@ -668,7 +734,7 @@ def apply_tags():
 
                 # Mark as applied
                 update_sql = f"""
-                UPDATE main.carmax_governance.classification_governance
+                UPDATE {GOVERNANCE_SCHEMA}.classification_governance
                 SET
                     review_status = 'APPLIED',
                     applied_at = current_timestamp()
@@ -723,7 +789,7 @@ def get_dashboard_stats():
             SUM(CASE WHEN review_status = 'APPLIED' THEN 1 ELSE 0 END) as applied,
             SUM(CASE WHEN sensitive_flag = TRUE THEN 1 ELSE 0 END) as sensitive_count,
             AVG(confidence_score) as avg_confidence
-        FROM main.carmax_governance.classification_governance
+        FROM {GOVERNANCE_SCHEMA}.classification_governance
         """
 
         stats = _execute_sql(stats_sql)[0]
@@ -783,7 +849,7 @@ def _get_unclassified_columns(catalog, schema, tables=None, columns_filter=None)
         c.table_name as table,
         c.column_name as column
     FROM system.information_schema.columns c
-    LEFT JOIN main.carmax_governance.classification_governance g
+    LEFT JOIN {GOVERNANCE_SCHEMA}.classification_governance g
         ON c.table_catalog = g.catalog_name
         AND c.table_schema = g.schema_name
         AND c.table_name = g.table_name
