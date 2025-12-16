@@ -14,15 +14,77 @@ Automatically classifies database columns against your organization's data taxon
 - Automatic Unity Catalog tag application
 - Review and approve classifications before tagging
 
-## Quick Setup
+## Setup and Installation
 
-See **[SIMPLE_SETUP.md](SIMPLE_SETUP.md)** for step-by-step instructions.
+### Prerequisites
+- Databricks workspace with Unity Catalog enabled
+- SQL Warehouse (get the warehouse ID)
+- Databricks CLI installed and configured
+- Python 3.9+
+- Your organization's data taxonomy in Excel format
 
-**Summary:**
-1. Create database tables (run SQL script)
-2. Import your taxonomy from Excel files
-3. Deploy the Databricks App
-4. Grant permissions to service principal
+### Step 1: Create Database Schema and Tables
+
+Run the SQL setup scripts to create required tables:
+
+```sql
+-- Run sql/setup_taxonomy.sql
+-- Run sql/setup_governance.sql
+```
+
+These scripts create two schemas:
+- `main.<your_org>_taxonomy` - Data element definitions
+- `main.<your_org>_governance` - Classification tracking
+
+### Step 2: Import Your Taxonomy
+
+Prepare your taxonomy Excel files with these columns:
+
+**Data Elements File:**
+- Element Name (e.g., "Social Security Number")
+- Element Category (e.g., "Personal Identifiers")
+- Sensitive_Flag ("Yes" or "No")
+- Description (optional)
+
+**Subject Types File (optional):**
+- Data Subject Type Id (e.g., "CUSTOMER")
+- Data Subject Type Name (e.g., "Customer")
+- Description
+
+Place Excel files in the `data/` folder and run the import script:
+
+```bash
+export WAREHOUSE_ID="your_warehouse_id"
+export DATABRICKS_CONFIG_PROFILE=your_profile
+python3 scripts/import_taxonomy.py
+```
+
+### Step 3: Configure and Deploy the App
+
+Update `databricks.yml` with your settings:
+- App name
+- Warehouse ID
+- Service principal name (optional)
+
+Deploy the app:
+
+```bash
+databricks bundle deploy -t dev
+```
+
+### Step 4: Grant Permissions
+
+Grant the app's service principal access to Unity Catalog:
+
+```sql
+GRANT ALL PRIVILEGES ON SCHEMA main.<your_org>_taxonomy TO `your-service-principal`;
+GRANT ALL PRIVILEGES ON SCHEMA main.<your_org>_governance TO `your-service-principal`;
+GRANT USE CATALOG ON CATALOG main TO `your-service-principal`;
+```
+
+### Step 5: Access the App
+
+After deployment, Databricks CLI will output the app URL. Open it in your browser to start classifying data!
 
 ## How To Use
 
@@ -45,22 +107,6 @@ View statistics about your taxonomy and classifications.
 - Approve or reject suggestions
 - Edit classifications if needed
 
-## Preparing Your Taxonomy
-
-Your organization's taxonomy should be provided in Excel format:
-
-**Data Elements File:**
-- Data Element Name (e.g., "Social Security Number")
-- Data Category (e.g., "Personal Identifiers")
-- Sensitive_Flag (Yes or No)
-- Description (optional)
-
-**Subject Types File:**
-- Data Subject Type Id (e.g., "CUSTOMER")
-- Data Subject Type Name (e.g., "Customer")
-- Description
-
-See **[EXCEL_FILE_FORMAT.md](EXCEL_FILE_FORMAT.md)** for detailed format requirements.
 
 ## Project Structure
 
@@ -83,7 +129,6 @@ ai_catalog/
 Update `databricks.yml` and SQL scripts to change schema names:
 - `<your_org>_taxonomy` - Data element definitions
 - `<your_org>_governance` - Classification tracking
-- `<your_org>_tags` - Unity Catalog tags
 
 ### Branding
 Update these files for your organization:
@@ -94,36 +139,19 @@ Update these files for your organization:
 ## Troubleshooting
 
 **No data elements showing:**
-- Make sure you ran the import script (see SIMPLE_SETUP.md Step 2)
-- Check that your Excel files match the required format
+- Make sure you ran the import script (see Setup and Installation Step 2)
+- Check that your Excel files have the required columns
 
 **Permission errors:**
 - Grant ALL PRIVILEGES on schemas to service principal
-- Check SIMPLE_SETUP.md Step 4
+- Ensure service principal has warehouse access
 
 **App not starting:**
-- Verify warehouse ID is correct
+- Verify warehouse ID is correct in `databricks.yml`
 - Check service principal has warehouse access
 
 **Changes not showing in browser:**
 - Do a hard refresh (Cmd+Shift+R or Ctrl+Shift+R)
-
-## Documentation
-
-- **[SIMPLE_SETUP.md](SIMPLE_SETUP.md)** - Quick setup guide
-- **[EXCEL_FILE_FORMAT.md](EXCEL_FILE_FORMAT.md)** - Excel file requirements
-
-## Requirements
-
-- Databricks workspace
-- SQL Warehouse with Unity Catalog
-- Databricks CLI
-- Python 3.9+
-- Your organization's data taxonomy in Excel format
-
-## Support
-
-For detailed deployment help, see SIMPLE_SETUP.md or contact your Databricks account team.
 
 ---
 
