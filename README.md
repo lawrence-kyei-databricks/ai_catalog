@@ -122,6 +122,26 @@ View statistics about your taxonomy and classifications.
 - Approve or reject suggestions
 - Edit classifications if needed
 
+## Viewing Applied Tags
+
+After classifying and approving data elements, you can view the applied tags through:
+
+### Catalog Explorer (UI)
+1. Click the **Catalog** icon in the sidebar
+2. Navigate to your catalog > schema > table
+3. On the table's page, view column tags in the **Tags** section
+
+### Using SQL
+Query the `INFORMATION_SCHEMA.COLUMN_TAGS` view to see all column tags:
+
+```sql
+SELECT *
+FROM main.information_schema.column_tags
+WHERE schema_name = '<your_org>_taxonomy';
+```
+
+For more details on Unity Catalog tags, see: https://docs.databricks.com/en/data-governance/unity-catalog/tags.html
+
 
 ## Project Structure
 
@@ -149,17 +169,10 @@ After initial setup, use the Taxonomy Tab in the web UI to:
 
 No need to re-import Excel files for ongoing updates.
 
-### Schema Names
-To change schema names from default "carmax" to your organization:
-- `sql/setup_taxonomy.sql` line 7
-- `sql/setup_governance.sql` line 7
-- `app/taxonomy_manager.py` line 30
-
 ### Branding
 Update these files for your organization:
 - `app/templates/app.html` - Header and title
 - `databricks.yml` - App name and description
-- `README.md` - This file
 
 ## Troubleshooting
 
@@ -167,16 +180,19 @@ Update these files for your organization:
 - Make sure you ran Step 2 (create schemas/tables) successfully
 - Verify you ran Step 3 (import script) with correct Excel files
 - Check that your Excel files have the exact required column names
-- Verify filenames are exactly: `Data_Element_Descriptions.xlsx` and `Personal_Data_subject_types.xlsx`
+- If using default file paths, verify filenames are: `Data_Element_Descriptions.xlsx` and `Personal_Data_subject_types.xlsx` in the `data/` folder
 
 **Schema creation errors:**
-- If using `setup_schemas.py`, update hardcoded warehouse_id and profile (lines 11-12)
-- For manual SQL execution, ensure you have CREATE SCHEMA permissions
+- Ensure `WAREHOUSE_ID` environment variable is set correctly
+- Verify `DATABRICKS_CONFIG_PROFILE` environment variable (if required)
+- Ensure you have CREATE SCHEMA permissions in Unity Catalog
 - Verify catalog name is "main" or update SQL files accordingly
 
 **Import script errors:**
-- Check environment variables: `WAREHOUSE_ID` and `DATABRICKS_CONFIG_PROFILE`
-- Ensure Excel files are in the `data/` folder with exact names
+- Check required environment variable: `WAREHOUSE_ID`
+- Verify `DATABRICKS_CONFIG_PROFILE` if using a non-default profile
+- If using default paths, ensure Excel files are in the `data/` folder
+- If using custom paths, verify the `--elements-file` and `--subjects-file` paths are correct
 - Review error messages for missing required columns
 
 **Permission errors:**
@@ -190,7 +206,3 @@ Update these files for your organization:
 
 **Changes not showing in browser:**
 - Do a hard refresh (Cmd+Shift+R or Ctrl+Shift+R)
-
----
-
-**Built with Databricks Apps, Claude 3.7 Sonnet, and Unity Catalog**
