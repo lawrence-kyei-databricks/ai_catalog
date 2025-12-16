@@ -28,7 +28,10 @@ class TaxonomyManager:
     def __init__(self, w: WorkspaceClient, warehouse_id: str = None):
         self.w = w
         self.warehouse_id = warehouse_id or os.environ.get('WAREHOUSE_ID')
-        self.taxonomy_schema = "main.carmax_taxonomy"
+
+        # Use environment variable for schema name, defaulting to carmax for backward compatibility
+        org_name = os.environ.get('ORG_NAME', 'carmax')
+        self.taxonomy_schema = f"main.{org_name}_taxonomy"
 
     def import_from_excel(self,
                           elements_file: str,

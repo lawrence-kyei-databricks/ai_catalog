@@ -21,63 +21,57 @@ Automatically classifies database columns against your organization's data taxon
 - SQL Warehouse (get the warehouse ID)
 - Databricks CLI installed and configured
 - Python 3.9+
-- Your organization's data taxonomy in Excel format
+- Your organization's data taxonomy in Excel/CSV format
 
-### Step 1: Customize for Your Organization
+### Step 1: Set Environment Variables
 
-Before deployment, update hardcoded values for your organization:
+Configure your environment with these required variables:
 
-**In `sql/setup_taxonomy.sql`:**
-- Line 7: Change `main.carmax_taxonomy` to `main.<your_org>_taxonomy`
+```bash
+export ORG_NAME="your_org"                    # e.g., "acme" (default: "carmax")
+export WAREHOUSE_ID="your_warehouse_id"       # Required
+export DATABRICKS_CONFIG_PROFILE="your_profile"  # Optional
+```
 
-**In `sql/setup_governance.sql`:**
-- Line 7: Change `main.carmax_governance` to `main.<your_org>_governance`
-
-**In `app/taxonomy_manager.py`:**
-- Line 30: Change `self.taxonomy_schema = "main.carmax_taxonomy"` to your org name
-
-**In `scripts/setup_schemas.py`:**
-- Lines 11-12: Update warehouse_id and profile for your environment
+These variables configure schema names (`main.{ORG_NAME}_taxonomy`) without any code changes.
 
 ### Step 2: Create Database Schemas and Tables
 
-Option A - Automated (recommended):
+Run the automated setup script:
+
 ```bash
-export DATABRICKS_CONFIG_PROFILE=your_profile
 python3 scripts/setup_schemas.py
 ```
 
-Option B - Manual:
-```bash
-databricks sql execute --warehouse-id YOUR_WAREHOUSE_ID --file sql/setup_taxonomy.sql
-databricks sql execute --warehouse-id YOUR_WAREHOUSE_ID --file sql/setup_governance.sql
-```
-
 This creates two schemas:
-- `main.<your_org>_taxonomy` - Data element definitions
-- `main.<your_org>_governance` - Classification tracking
+- `main.{ORG_NAME}_taxonomy` - Data element definitions
+- `main.{ORG_NAME}_governance` - Classification tracking
 
 ### Step 3: Import Your Taxonomy
 
-Prepare your taxonomy Excel files with these exact columns:
+Prepare your taxonomy Excel/CSV files with these columns:
 
-**Data Elements File** (name: `Data_Element_Descriptions.xlsx`):
+**Data Elements File:**
 - Data Element Name (e.g., "Social Security Number")
 - Data Category (e.g., "Personal Identifiers")
 - Sensitive_Flag ("Yes" or "No")
 - Description (optional)
 
-**Subject Types File** (name: `Personal_Data_subject_types.xlsx`):
+**Subject Types File:**
 - Data Subject Type Id (e.g., "CUSTOMER")
 - Data Subject Type Name (e.g., "Customer")
 - Description
 
-Place Excel files in the `data/` folder with the exact names above, then run:
-
+Option A - Using default file paths (place files in `data/` folder):
 ```bash
-export WAREHOUSE_ID="your_warehouse_id"
-export DATABRICKS_CONFIG_PROFILE=your_profile
 python3 scripts/import_taxonomy.py
+```
+
+Option B - Using custom file paths:
+```bash
+python3 scripts/import_taxonomy.py \
+  --elements-file /path/to/your/elements.xlsx \
+  --subjects-file /path/to/your/subjects.xlsx
 ```
 
 ### Step 4: Configure and Deploy the App
