@@ -1,6 +1,6 @@
 # Data Classification Platform
 
-AI-powered data classification for Unity Catalog using Claude 3.7 Sonnet.
+AI-powered data classification using Unity Catalog, and Claude 3.7 Sonnet.
 
 ## What It Does
 
