@@ -23,35 +23,56 @@ Automatically classifies database columns against your organization's data taxon
 - Python 3.9+
 - Your organization's data taxonomy in Excel format
 
-### Step 1: Create Database Schema and Tables
+### Step 1: Customize for Your Organization
 
-Run the SQL setup scripts to create required tables:
+Before deployment, update hardcoded values for your organization:
 
-```sql
--- Run sql/setup_taxonomy.sql
--- Run sql/setup_governance.sql
+**In `sql/setup_taxonomy.sql`:**
+- Line 7: Change `main.carmax_taxonomy` to `main.<your_org>_taxonomy`
+
+**In `sql/setup_governance.sql`:**
+- Line 7: Change `main.carmax_governance` to `main.<your_org>_governance`
+
+**In `app/taxonomy_manager.py`:**
+- Line 30: Change `self.taxonomy_schema = "main.carmax_taxonomy"` to your org name
+
+**In `scripts/setup_schemas.py`:**
+- Lines 11-12: Update warehouse_id and profile for your environment
+
+### Step 2: Create Database Schemas and Tables
+
+Option A - Automated (recommended):
+```bash
+export DATABRICKS_CONFIG_PROFILE=your_profile
+python3 scripts/setup_schemas.py
 ```
 
-These scripts create two schemas:
+Option B - Manual:
+```bash
+databricks sql execute --warehouse-id YOUR_WAREHOUSE_ID --file sql/setup_taxonomy.sql
+databricks sql execute --warehouse-id YOUR_WAREHOUSE_ID --file sql/setup_governance.sql
+```
+
+This creates two schemas:
 - `main.<your_org>_taxonomy` - Data element definitions
 - `main.<your_org>_governance` - Classification tracking
 
-### Step 2: Import Your Taxonomy
+### Step 3: Import Your Taxonomy
 
-Prepare your taxonomy Excel files with these columns:
+Prepare your taxonomy Excel files with these exact columns:
 
-**Data Elements File:**
-- Element Name (e.g., "Social Security Number")
-- Element Category (e.g., "Personal Identifiers")
+**Data Elements File** (name: `Data_Element_Descriptions.xlsx`):
+- Data Element Name (e.g., "Social Security Number")
+- Data Category (e.g., "Personal Identifiers")
 - Sensitive_Flag ("Yes" or "No")
 - Description (optional)
 
-**Subject Types File (optional):**
+**Subject Types File** (name: `Personal_Data_subject_types.xlsx`):
 - Data Subject Type Id (e.g., "CUSTOMER")
 - Data Subject Type Name (e.g., "Customer")
 - Description
 
-Place Excel files in the `data/` folder and run the import script:
+Place Excel files in the `data/` folder with the exact names above, then run:
 
 ```bash
 export WAREHOUSE_ID="your_warehouse_id"
@@ -59,7 +80,7 @@ export DATABRICKS_CONFIG_PROFILE=your_profile
 python3 scripts/import_taxonomy.py
 ```
 
-### Step 3: Configure and Deploy the App
+### Step 4: Configure and Deploy the App
 
 Update `databricks.yml` with your settings:
 - App name
@@ -125,10 +146,20 @@ ai_catalog/
 
 ## Customization
 
+### Ongoing Taxonomy Management
+After initial setup, use the Taxonomy Tab in the web UI to:
+- Add new data elements
+- Edit existing elements
+- Delete elements
+- Search and filter by category
+
+No need to re-import Excel files for ongoing updates.
+
 ### Schema Names
-Update `databricks.yml` and SQL scripts to change schema names:
-- `<your_org>_taxonomy` - Data element definitions
-- `<your_org>_governance` - Classification tracking
+To change schema names from default "carmax" to your organization:
+- `sql/setup_taxonomy.sql` line 7
+- `sql/setup_governance.sql` line 7
+- `app/taxonomy_manager.py` line 30
 
 ### Branding
 Update these files for your organization:
@@ -139,16 +170,29 @@ Update these files for your organization:
 ## Troubleshooting
 
 **No data elements showing:**
-- Make sure you ran the import script (see Setup and Installation Step 2)
-- Check that your Excel files have the required columns
+- Make sure you ran Step 2 (create schemas/tables) successfully
+- Verify you ran Step 3 (import script) with correct Excel files
+- Check that your Excel files have the exact required column names
+- Verify filenames are exactly: `Data_Element_Descriptions.xlsx` and `Personal_Data_subject_types.xlsx`
+
+**Schema creation errors:**
+- If using `setup_schemas.py`, update hardcoded warehouse_id and profile (lines 11-12)
+- For manual SQL execution, ensure you have CREATE SCHEMA permissions
+- Verify catalog name is "main" or update SQL files accordingly
+
+**Import script errors:**
+- Check environment variables: `WAREHOUSE_ID` and `DATABRICKS_CONFIG_PROFILE`
+- Ensure Excel files are in the `data/` folder with exact names
+- Review error messages for missing required columns
 
 **Permission errors:**
-- Grant ALL PRIVILEGES on schemas to service principal
-- Ensure service principal has warehouse access
+- Grant ALL PRIVILEGES on both schemas to service principal
+- Ensure service principal has warehouse access and USE CATALOG permission
 
 **App not starting:**
 - Verify warehouse ID is correct in `databricks.yml`
 - Check service principal has warehouse access
+- Ensure schemas exist before starting app
 
 **Changes not showing in browser:**
 - Do a hard refresh (Cmd+Shift+R or Ctrl+Shift+R)
