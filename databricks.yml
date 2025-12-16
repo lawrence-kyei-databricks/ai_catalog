@@ -1,7 +1,20 @@
 # CarMax Data Classification Platform - DABs Configuration
+#
+# ============================================================
+# MULTI-ORGANIZATION DEPLOYMENT NOTES:
+# ============================================================
+# When deploying for a different organization, update:
+# 1. 'bundle.name' below (e.g., "acme-classification")
+# 2. 'catalog' variable defaults if using different catalog
+# 3. 'targets.prod.variables.catalog' for production deployment
+# 4. 'targets.dev.workspace' and 'targets.prod.workspace' hosts
+#
+# This file supports variable substitution using ${var.variable_name}
+# syntax, making it more flexible than app.yaml for dynamic values.
+# ============================================================
 
 bundle:
-  name: carmax-classification
+  name: carmax-classification  # Update this for your organization
 
 variables:
   warehouse_id:
@@ -28,19 +41,19 @@ targets:
     mode: development
     default: true
     workspace:
-      host: https://e2-demo-field-eng.cloud.databricks.com
-      profile: e2-demo-field-eng
+      host: https://e2-demo-field-eng.cloud.databricks.com  # Update with your workspace URL
+      profile: e2-demo-field-eng  # Update with your workspace profile
 
     variables:
-      catalog: "main"
+      catalog: "main"  # Update if using a different catalog
       environment: "dev"
 
   # Production environment
   prod:
     mode: production
     workspace:
-      host: ${workspace.host}
+      host: ${workspace.host}  # Set via environment variable or CLI flag
 
     variables:
-      catalog: "carmax"
+      catalog: "carmax"  # Update with your production catalog name
       environment: "prod"

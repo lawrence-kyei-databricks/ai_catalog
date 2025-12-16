@@ -1,25 +1,41 @@
 # Databricks App Configuration
-# Defines entry point for CarMax Data Classification Platform
+# Defines entry point for Data Classification Platform
+#
+# ============================================================
+# MULTI-ORGANIZATION DEPLOYMENT NOTES:
+# ============================================================
+# When deploying for a different organization, update:
+# 1. 'name' field below (e.g., "acme-classification")
+# 2. Warehouse ID in both 'resources' and 'env' sections
+# 3. Add ORG_NAME to 'env' section (defaults to 'carmax' in code)
+# 4. Update catalog name if different from 'main'
+#
+# The application code uses ORG_NAME environment variable to
+# dynamically create schema names (e.g., main.{ORG_NAME}_taxonomy)
+# ============================================================
 
 command:
   - "sh"
   - "-c"
   - "gunicorn --bind 0.0.0.0:${DATABRICKS_APP_PORT:-8000} --workers 1 --timeout 120 app.main:app"
 
-name: carmax-classification
+name: carmax-classification  # Update this for your organization
 
 resources:
   - name: warehouse
     description: SQL warehouse for UC operations and classification
     warehouse:
-      id: "8baced1ff014912d"
+      id: "8baced1ff014912d"  # Update with your warehouse ID
 
 env:
   - name: WAREHOUSE_ID
-    value: "8baced1ff014912d"
+    value: "8baced1ff014912d"  # Update with your warehouse ID
+
+  - name: ORG_NAME
+    value: "carmax"  # Update with your organization name
 
   - name: TARGET_CATALOG
-    value: "main"
+    value: "main"  # Update if using a different catalog
 
   - name: MODEL_ENDPOINT
     value: "databricks-claude-3-7-sonnet"
