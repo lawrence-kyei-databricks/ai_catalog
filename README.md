@@ -176,33 +176,37 @@ Update these files for your organization:
 
 ## Troubleshooting
 
-**No data elements showing:**
-- Make sure you ran Step 2 (create schemas/tables) successfully
-- Verify you ran Step 3 (import script) with correct Excel files
-- Check that your Excel files have the exact required column names
-- If using default file paths, verify filenames are: `Data_Element_Descriptions.xlsx` and `Personal_Data_subject_types.xlsx` in the `data/` folder
+**No data elements showing in Taxonomy tab:**
+- Use the Taxonomy tab's "Import from Excel" feature to load your taxonomy
+- Ensure your Excel files have the required columns (see Step 3 above)
+- Check browser console for errors
+- Verify the `ORG_NAME` environment variable matches your deployed schema name
 
-**Schema creation errors:**
-- Ensure `WAREHOUSE_ID` environment variable is set correctly
-- Verify `DATABRICKS_CONFIG_PROFILE` environment variable (if required)
-- Ensure you have CREATE SCHEMA permissions in Unity Catalog
-- Verify catalog name is "main" or update SQL files accordingly
-
-**Import script errors:**
-- Check required environment variable: `WAREHOUSE_ID`
-- Verify `DATABRICKS_CONFIG_PROFILE` if using a non-default profile
-- If using default paths, ensure Excel files are in the `data/` folder
-- If using custom paths, verify the `--elements-file` and `--subjects-file` paths are correct
-- Review error messages for missing required columns
+**Schema not found errors:**
+- Run `python3 scripts/setup_schemas.py` to create required schemas
+- Ensure `WAREHOUSE_ID` and `ORG_NAME` environment variables are set
+- Verify you have CREATE SCHEMA permissions in Unity Catalog
+- Check that schemas `main.{ORG_NAME}_taxonomy` and `main.{ORG_NAME}_governance` exist
 
 **Permission errors:**
-- Grant ALL PRIVILEGES on both schemas to service principal
-- Ensure service principal has warehouse access and USE CATALOG permission
+- Grant ALL PRIVILEGES on both `{ORG_NAME}_taxonomy` and `{ORG_NAME}_governance` schemas to the app's service principal
+- Ensure service principal has warehouse access and USE CATALOG permission on the main catalog
 
-**App not starting:**
-- Verify warehouse ID is correct in `databricks.yml`
-- Check service principal has warehouse access
-- Ensure schemas exist before starting app
+**App not starting or crashes:**
+- Verify `WAREHOUSE_ID` is correct in `app.yaml`
+- Verify `ORG_NAME` is set correctly (defaults to "carmax" if not set)
+- Check that schemas exist before starting the app
+- Review app logs for missing environment variables
+
+**Classification not working:**
+- Ensure you've imported taxonomy data via the Taxonomy tab
+- Verify the model endpoint `databricks-claude-3-7-sonnet` is available in your workspace
+- Check that the selected catalog/schema exists and you have permissions
+
+**Tags not showing in Unity Catalog:**
+- Tag creation happens automatically when you import taxonomy via the Taxonomy tab
+- Check that you have tag creation permissions in Unity Catalog
+- Review app logs for tag creation errors (may show rate limiting)
 
 **Changes not showing in browser:**
 - Do a hard refresh (Cmd+Shift+R or Ctrl+Shift+R)
