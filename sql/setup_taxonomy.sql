@@ -7,10 +7,6 @@
 CREATE SCHEMA IF NOT EXISTS main.carmax_taxonomy
 COMMENT 'CarMax Data Classification Taxonomy - Source of Truth';
 
--- Create tags schema
-CREATE SCHEMA IF NOT EXISTS main.carmax_tags
-COMMENT 'CarMax Classification Tags (172 elements)';
-
 -- =====================================================
 -- TABLE 1: Data Elements (172 from Excel)
 -- =====================================================
@@ -124,4 +120,3 @@ VALUES
 -- Grant permissions (adjust as needed)
 -- =====================================================
 -- GRANT ALL PRIVILEGES ON SCHEMA main.carmax_taxonomy TO `<service-principal-id>`;
--- GRANT ALL PRIVILEGES ON SCHEMA main.carmax_tags TO `<service-principal-id>`;
