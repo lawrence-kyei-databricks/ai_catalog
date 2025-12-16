@@ -236,48 +236,98 @@ async function classifyColumns() {
 // Load review list
 async function loadReview() {
     const listEl = document.getElementById('review-list');
+    const statusFilter = document.getElementById('review-status-filter')?.value || 'PENDING';
 
     try {
-        const response = await fetch('/api/classifications?status=PENDING');
+        // Build API URL with status filter
+        let apiUrl = '/api/classifications';
+        if (statusFilter !== 'ALL') {
+            apiUrl += `?status=${statusFilter}`;
+        }
+
+        const response = await fetch(apiUrl);
         const data = await response.json();
 
         if (!data.items || data.items.length === 0) {
-            listEl.innerHTML = '<p style="color: #64748b; text-align: center; padding: 40px;">No pending classifications</p>';
+            const statusLabel = statusFilter === 'ALL' ? 'classifications' : `${statusFilter.toLowerCase()} classifications`;
+            listEl.innerHTML = `<p style="color: #64748b; text-align: center; padding: 40px;">No ${statusLabel}</p>`;
             return;
         }
 
-        listEl.innerHTML = data.items.map(c => `
-            <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px; margin-bottom: 12px;">
-                <div style="display: flex; justify-content: space-between; align-items: start;">
-                    <div style="flex: 1;">
-                        <strong>${c.catalog_name}.${c.schema_name}.${c.table_name}.${c.column_name}</strong>
-                        <div style="margin-top: 8px; color: #64748b; font-size: 14px;">
-                            <div>Type: <strong>${c.column_type || 'Unknown'}</strong></div>
-                            <div style="margin-top: 4px;">
-                                Classification: <strong style="color: #3b82f6;">${c.suggested_category || 'N/A'}</strong>
-                                ${c.suggested_element ? ` - ${c.suggested_element}` : ''}
-                            </div>
-                            <div style="margin-top: 4px;">
-                                Confidence: <span style="color: #16a34a; font-weight: 600;">${Math.round(c.confidence_score)}%</span>
-                            </div>
-                        </div>
-                    </div>
+        listEl.innerHTML = data.items.map(c => {
+            // Show status badge
+            const statusColors = {
+                'PENDING': { bg: '#fef3c7', color: '#92400e' },
+                'APPROVED': { bg: '#d1fae5', color: '#065f46' },
+                'AUTO_APPROVED': { bg: '#dbeafe', color: '#1e40af' },
+                'APPLIED': { bg: '#dcfce7', color: '#15803d' },
+                'REJECTED': { bg: '#fee2e2', color: '#991b1b' }
+            };
+            const statusColor = statusColors[c.review_status] || { bg: '#f1f5f9', color: '#475569' };
+
+            // Show action buttons only for pending items
+            // Escape values for onclick handler
+            const escapedElement = (c.suggested_element || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const escapedCategory = (c.suggested_category || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
+            const actionButtons = (c.review_status === 'PENDING') ? `
+                <div style="display: flex; gap: 8px; flex-direction: column; align-items: flex-end;">
                     <div style="display: flex; gap: 8px;">
                         <button class="btn btn-primary" onclick="approveClassification(${c.id})">Approve</button>
-                        <button class="btn btn-secondary" onclick="rejectClassification(${c.id})">Reject</button>
+                        <button class="btn btn-danger" onclick="rejectClassification(${c.id})">Reject</button>
+                    </div>
+                    <button class="btn btn-secondary" onclick="openEditModal(${c.id}, '${escapedElement}', '${escapedCategory}')">Edit</button>
+                </div>
+            ` : `
+                <div style="display: flex; gap: 8px; flex-direction: column; align-items: flex-end;">
+                    <div style="padding: 8px 16px; background: ${statusColor.bg}; color: ${statusColor.color}; border-radius: 6px; font-weight: 600; font-size: 14px;">
+                        ${(c.review_status || 'UNKNOWN').replace(/_/g, ' ')}
+                    </div>
+                    <button class="btn btn-secondary" onclick="openEditModal(${c.id}, '${escapedElement}', '${escapedCategory}')">Edit</button>
+                </div>
+            `;
+
+            return `
+                <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px; margin-bottom: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div style="flex: 1;">
+                            <strong>${c.catalog_name}.${c.schema_name}.${c.table_name}.${c.column_name}</strong>
+                            <div style="margin-top: 8px; color: #64748b; font-size: 14px;">
+                                <div>Type: <strong>${c.column_type || 'Unknown'}</strong></div>
+                                <div style="margin-top: 4px;">
+                                    Classification: <strong style="color: #3b82f6;">${c.suggested_category || 'N/A'}</strong>
+                                    ${c.suggested_element ? ` - ${c.suggested_element}` : ''}
+                                </div>
+                                <div style="margin-top: 4px;">
+                                    Confidence: <span style="color: #16a34a; font-weight: 600;">${Math.round(c.confidence_score)}%</span>
+                                </div>
+                            </div>
+                        </div>
+                        ${actionButtons}
                     </div>
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     } catch (error) {
         console.error('Review load failed:', error);
+        listEl.innerHTML = '<p style="color: #ef4444; text-align: center; padding: 40px;">Error loading classifications</p>';
     }
 }
 
 // Approve classification
 async function approveClassification(id) {
     try {
-        await fetch(`/api/classifications/${id}/approve`, { method: 'POST' });
+        const response = await fetch(`/api/classifications/${id}/approve`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notes: '' })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Approval failed');
+        }
+
         showMessage('review', 'success', '✓ Classification approved');
         loadReview();
         loadDashboard();
@@ -289,8 +339,106 @@ async function approveClassification(id) {
 // Reject classification
 async function rejectClassification(id) {
     try {
-        await fetch(`/api/classifications/${id}/reject`, { method: 'POST' });
+        const response = await fetch(`/api/classifications/${id}/reject`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason: '' })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Rejection failed');
+        }
+
         showMessage('review', 'info', 'Classification rejected');
+        loadReview();
+        loadDashboard();
+    } catch (error) {
+        showMessage('review', 'error', `Error: ${error.message}`);
+    }
+}
+
+// Open edit classification modal
+let taxonomyElementsCache = null;
+
+async function openEditModal(classificationId, currentElement, currentCategory) {
+    try {
+        // Fetch taxonomy elements if not cached
+        if (!taxonomyElementsCache) {
+            const response = await fetch('/api/taxonomy/elements');
+            const data = await response.json();
+            taxonomyElementsCache = data.elements;
+        }
+
+        // Populate the dropdown
+        const selectEl = document.getElementById('edit-classification-element');
+        selectEl.innerHTML = '<option value="">Select element...</option>';
+
+        taxonomyElementsCache.forEach(elem => {
+            const option = document.createElement('option');
+            option.value = elem.element_name;
+            option.textContent = elem.element_name;
+            option.dataset.category = elem.element_category;
+            if (elem.element_name === currentElement) {
+                option.selected = true;
+            }
+            selectEl.appendChild(option);
+        });
+
+        // Set current values
+        document.getElementById('edit-classification-id').value = classificationId;
+        document.getElementById('edit-classification-category').value = currentCategory;
+        document.getElementById('edit-classification-notes').value = '';
+
+        // Show modal
+        const modal = document.getElementById('edit-classification-modal');
+        modal.style.display = 'flex';
+    } catch (error) {
+        showMessage('review', 'error', `Error loading taxonomy: ${error.message}`);
+    }
+}
+
+// Update category when element is selected
+function updateCategoryFromElement() {
+    const selectEl = document.getElementById('edit-classification-element');
+    const selectedOption = selectEl.options[selectEl.selectedIndex];
+    const category = selectedOption.dataset.category || '';
+    document.getElementById('edit-classification-category').value = category;
+}
+
+// Close edit classification modal
+function closeEditClassificationModal() {
+    document.getElementById('edit-classification-modal').style.display = 'none';
+}
+
+// Save edited classification
+async function saveEditClassification() {
+    const classificationId = document.getElementById('edit-classification-id').value;
+    const newElement = document.getElementById('edit-classification-element').value;
+    const notes = document.getElementById('edit-classification-notes').value;
+
+    if (!newElement) {
+        showMessage('review', 'error', 'Please select a data element');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/classifications/${classificationId}/update-element`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                new_element: newElement,
+                notes: notes
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Update failed');
+        }
+
+        showMessage('review', 'success', '✓ Classification updated successfully');
+        closeEditClassificationModal();
         loadReview();
         loadDashboard();
     } catch (error) {

@@ -315,8 +315,22 @@ Return ONLY valid JSON in this exact format:
         Finalize classification with auto-approval decision
         """
 
-        # Apply auto-approval logic
-        approval_decision = self._auto_approval_decision(classification)
+        # Validate element exists in taxonomy
+        element = classification.get('element', '')
+        if not element or element.lower() in ['no matching element', 'no match', 'none', 'unknown']:
+            classification['element'] = 'No matching element'
+            classification['confidence'] = 0
+            # Force manual review
+            approval_decision = {
+                'review_status': 'PENDING',
+                'approval_tier': 3,
+                'requires_review': True,
+                'review_priority': 'LOW',
+                'review_reasons': ['No matching taxonomy element found']
+            }
+        else:
+            # Apply auto-approval logic
+            approval_decision = self._auto_approval_decision(classification)
 
         # Create final result
         final_result = {

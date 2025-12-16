@@ -442,6 +442,7 @@ def get_classifications():
             sensitive_flag,
             data_subjects,
             review_priority,
+            review_status,
             reasoning,
             sample_values,
             created_at
@@ -517,6 +518,71 @@ def reject_classification(id):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/classifications/<int:id>/update-element', methods=['POST'])
+def update_classification_element(id):
+    """Update the element for a classification (reassignment)"""
+    try:
+        new_element = request.json.get('new_element', '')
+        notes = request.json.get('notes', '')
+
+        if not new_element:
+            return jsonify({'error': 'new_element is required'}), 400
+
+        # Get the element's category from taxonomy
+        element_query = f"""
+        SELECT element_name, element_category, sensitive_flag
+        FROM main.carmax_taxonomy.data_elements
+        WHERE element_name = '{new_element.replace("'", "''")}'
+        AND active = TRUE
+        LIMIT 1
+        """
+        element_result = _execute_sql(element_query)
+
+        if not element_result:
+            return jsonify({'error': f'Element "{new_element}" not found in taxonomy'}), 404
+
+        element_info = element_result[0]
+        element_category = element_info['element_category']
+        sensitive_flag = element_info.get('sensitive_flag', 'No')
+
+        # Update the classification with new element
+        # Set status back to PENDING if it was already approved, so it needs re-review
+        sql = f"""
+        UPDATE main.carmax_governance.classification_governance
+        SET
+            suggested_element = '{new_element.replace("'", "''")}',
+            suggested_category = '{element_category.replace("'", "''")}',
+            sensitive_flag = {str(sensitive_flag == 'Yes').upper()},
+            review_status = CASE
+                WHEN review_status IN ('APPROVED', 'AUTO_APPROVED', 'APPLIED') THEN 'PENDING'
+                ELSE review_status
+            END,
+            approved_element = NULL,
+            reviewer = CASE
+                WHEN review_status IN ('APPROVED', 'AUTO_APPROVED', 'APPLIED') THEN NULL
+                ELSE reviewer
+            END,
+            reviewed_at = CASE
+                WHEN review_status IN ('APPROVED', 'AUTO_APPROVED', 'APPLIED') THEN NULL
+                ELSE reviewed_at
+            END,
+            review_notes = '{notes.replace("'", "''")}'
+        WHERE id = {id}
+        """
+
+        _execute_sql(sql)
+
+        return jsonify({
+            'success': True,
+            'id': id,
+            'new_element': new_element,
+            'category': element_category
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/classifications/bulk-approve', methods=['POST'])
 def bulk_approve():
     """Bulk approve classifications"""
@@ -560,11 +626,12 @@ def bulk_approve():
 
 @app.route('/api/apply-tags', methods=['POST'])
 def apply_tags():
-    """Apply approved classifications as UC tags"""
+    """Apply approved classifications as UC column tags using SQL ALTER TABLE"""
     try:
-        # Get approved classifications
+        # Get approved classifications with valid elements
         sql = """
         SELECT
+            id,
             catalog_name,
             schema_name,
             table_name,
@@ -573,12 +640,15 @@ def apply_tags():
         FROM main.carmax_governance.classification_governance
         WHERE review_status IN ('APPROVED', 'AUTO_APPROVED')
           AND applied_at IS NULL
+          AND COALESCE(approved_element, suggested_element) IS NOT NULL
+          AND LOWER(COALESCE(approved_element, suggested_element)) NOT IN ('no matching element', 'no match', 'none', 'unknown')
         LIMIT 100
         """
 
         classifications = _execute_sql(sql)
 
         applied = 0
+        skipped = 0
         errors = []
 
         for item in classifications:
@@ -586,11 +656,12 @@ def apply_tags():
                 # Get element_id for tag
                 element_id = _generate_element_id(item['element'])
 
-                # Apply tag to column
+                # Apply tag using SQL ALTER TABLE syntax
+                # Syntax: ALTER TABLE catalog.schema.table ALTER COLUMN column_name SET TAGS ('tag_key' = 'tag_value')
                 tag_sql = f"""
                 ALTER TABLE `{item['catalog_name']}`.`{item['schema_name']}`.`{item['table_name']}`
                 ALTER COLUMN `{item['column_name']}`
-                SET TAGS ('main.carmax_tags.`{element_id}`' = 'CLASSIFIED')
+                SET TAGS ('{element_id}' = 'Yes')
                 """
 
                 _execute_sql(tag_sql)
@@ -601,10 +672,7 @@ def apply_tags():
                 SET
                     review_status = 'APPLIED',
                     applied_at = current_timestamp()
-                WHERE catalog_name = '{item['catalog_name']}'
-                  AND schema_name = '{item['schema_name']}'
-                  AND table_name = '{item['table_name']}'
-                  AND column_name = '{item['column_name']}'
+                WHERE id = {item['id']}
                 """
 
                 _execute_sql(update_sql)
@@ -612,15 +680,26 @@ def apply_tags():
                 applied += 1
 
             except Exception as e:
-                errors.append({
-                    'column': f"{item['catalog_name']}.{item['schema_name']}.{item['table_name']}.{item['column_name']}",
-                    'error': str(e)
-                })
+                error_msg = str(e)
+                # Check if tag policy doesn't exist
+                if 'TAG_NOT_FOUND' in error_msg or 'not found' in error_msg.lower():
+                    errors.append({
+                        'column': f"{item['catalog_name']}.{item['schema_name']}.{item['table_name']}.{item['column_name']}",
+                        'element': item['element'],
+                        'error': f'Tag policy not found for element: {element_id}'
+                    })
+                else:
+                    errors.append({
+                        'column': f"{item['catalog_name']}.{item['schema_name']}.{item['table_name']}.{item['column_name']}",
+                        'element': item['element'],
+                        'error': error_msg[:200]
+                    })
 
         return jsonify({
             'success': True,
             'applied': applied,
             'total': len(classifications),
+            'skipped': skipped,
             'errors': errors
         })
 

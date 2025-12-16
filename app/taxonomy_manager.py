@@ -29,7 +29,6 @@ class TaxonomyManager:
         self.w = w
         self.warehouse_id = warehouse_id or os.environ.get('WAREHOUSE_ID')
         self.taxonomy_schema = "main.carmax_taxonomy"
-        self.tags_schema = "main.carmax_tags"
 
     def import_from_excel(self,
                           elements_file: str,
@@ -128,13 +127,14 @@ class TaxonomyManager:
                 sensitive_flag = source.sensitive_flag,
                 data_classification = source.data_classification,
                 keywords = source.keywords,
+                active = TRUE,
                 updated_at = current_timestamp()
             WHEN NOT MATCHED THEN
               INSERT (element_id, element_name, element_category, element_description,
-                     sensitive_flag, data_classification, keywords)
+                     sensitive_flag, data_classification, keywords, active)
               VALUES (source.element_id, source.element_name, source.element_category,
                      source.element_description, source.sensitive_flag,
-                     source.data_classification, source.keywords)
+                     source.data_classification, source.keywords, TRUE)
             """
 
             try:
@@ -197,40 +197,76 @@ class TaxonomyManager:
             self._execute_sql(sql)
 
     def _sync_uc_tags(self) -> int:
-        """Create Unity Catalog tags for all 172 data elements"""
+        """
+        Create Unity Catalog Tag Policies for all 172 data elements.
+
+        Uses REST API: POST /api/2.0/tag-policies
+        Implements production-ready rate limiting (3s between requests) to avoid API throttling.
+
+        Returns:
+            Number of tag policies created or already existing
+        """
+        import time
 
         # Get all active elements
         elements = self._execute_sql(f"""
-            SELECT element_id, element_name, element_description
+            SELECT element_id, element_name, element_description, sensitive_flag
             FROM {self.taxonomy_schema}.data_elements
             WHERE active = TRUE
         """)
 
         tags_created = 0
+        tags_failed = 0
 
-        for elem in elements:
-            tag_name = elem['element_id']
+        print(f"[TaxonomyManager] Creating {len(elements)} tag policies with rate limiting...")
+        print(f"[TaxonomyManager] Estimated time: {len(elements) * 3 / 60:.1f} minutes")
+
+        for i, elem in enumerate(elements):
+            tag_key = elem['element_id']
             description = elem.get('element_description', elem['element_name'])
 
-            # Create tag (idempotent)
-            sql = f"""
-            CREATE TAG IF NOT EXISTS {self.tags_schema}.`{tag_name}`
-            """
+            max_retries = 2
+            for attempt in range(max_retries):
+                try:
+                    self.w.api_client.do(
+                        'POST',
+                        '/api/2.0/tag-policies',
+                        body={
+                            'tag_policy': {
+                                'key': tag_key,
+                                'values': [{'name': 'Yes'}, {'name': 'No'}],
+                                'description': description[:256] if description else tag_key
+                            }
+                        }
+                    )
+                    tags_created += 1
+                    if (i + 1) % 10 == 0:
+                        print(f"[TaxonomyManager] Progress: {tags_created}/{len(elements)}")
+                    break
+                except Exception as e:
+                    error_msg = str(e)
+                    if 'RESOURCE_ALREADY_EXISTS' in error_msg or 'already exists' in error_msg.lower():
+                        tags_created += 1
+                        break
+                    elif '429' in error_msg or 'rate limit' in error_msg.lower():
+                        wait_time = 10 * (attempt + 1)
+                        print(f"[TaxonomyManager] Rate limited, waiting {wait_time}s...")
+                        time.sleep(wait_time)
+                    else:
+                        # Show actual error details instead of just "None"
+                        print(f"[TaxonomyManager] Error creating {tag_key}: {error_msg[:200]}")
+                        if attempt == max_retries - 1:
+                            tags_failed += 1
+                        break
 
-            try:
-                self._execute_sql(sql)
+            # Production-ready delay: 3 seconds between ALL requests
+            time.sleep(3.0)
 
-                # Add comment to tag
-                comment_sql = f"""
-                COMMENT ON TAG {self.tags_schema}.`{tag_name}`
-                IS {self._quote(description)}
-                """
-                self._execute_sql(comment_sql)
+            # Extra pause every 5 requests
+            if (i + 1) % 5 == 0:
+                time.sleep(10)
 
-                tags_created += 1
-            except Exception as e:
-                print(f"[TaxonomyManager] Warning: Could not create tag {tag_name}: {e}")
-
+        print(f"[TaxonomyManager] Complete: {tags_created} created/exist, {tags_failed} failed")
         return tags_created
 
     def get_active_taxonomy(self) -> Dict:
