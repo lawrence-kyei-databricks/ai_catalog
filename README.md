@@ -1,6 +1,6 @@
-# Data Classification Platform
+# Data Classification Platform on Databricks
 
-AI-powered data classification using Unity Catalog, and Claude 3.7 Sonnet.
+AI-powered data classification using Databricks Unity Catalog and Claude 3.7 Sonnet.
 
 ## What It Does
 
@@ -10,73 +10,35 @@ Automatically classifies database columns against your organization's data taxon
 
 ```mermaid
 flowchart TB
-    Start([User: Classify New Table]) --> Discover[Discover All Columns<br/>Query system.information_schema]
-    Discover --> Loop{For Each Column}
+    Start([Classify Table]) --> UC[Databricks Unity Catalog<br/>Query INFORMATION_SCHEMA]
+    UC --> Classify{3-Tier Classification}
 
-    Loop --> Tier1{Tier 1: Pattern Match?<br/>Regex: SSN, Email, Phone, CC}
-    Tier1 -->|Match| Pattern[Return Element<br/>Confidence: 100%<br/>Source: PATTERN]
-    Tier1 -->|No Match| Tier2
+    Classify -->|Tier 1| Pattern[Pattern Match<br/>Regex: SSN, Email, Phone]
+    Classify -->|Tier 2| Cache[Fingerprint Cache<br/>MD5: name + type + pattern]
+    Classify -->|Tier 3| AI[Claude AI via ai_query<br/>Databricks Foundation Models]
 
-    Tier2{Tier 2: Cache Hit?<br/>Check Fingerprint}
-    Tier2 -->|Found & High Confidence| Cache[Return Cached Element<br/>Confidence: 95%+<br/>Source: CACHE]
-    Tier2 -->|No Cache| Tier3
+    Pattern --> Approve{Auto-Approval}
+    Cache --> Approve
+    AI --> Approve
 
-    Tier3[Tier 3: Claude AI Classification]
-    Tier3 --> LoadTax[Load 172-Element Taxonomy<br/>from org_taxonomy.data_elements]
-    LoadTax --> Sample[Get 100 Sample Values<br/>SELECT col FROM table LIMIT 100]
-    Sample --> BuildPrompt[Build AI Prompt:<br/>- Column name & type<br/>- Sample values<br/>- Full taxonomy<br/>- Classification instructions]
-    BuildPrompt --> CallClaude[Call ai_query<br/>Model: databricks-claude-3-7-sonnet]
+    Approve -->|≥95% Confidence| Auto1[AUTO_APPROVED]
+    Approve -->|≥85% Non-Sensitive| Auto2[AUTO_APPROVED]
+    Approve -->|<85% or Sensitive| Manual[PENDING Review]
 
-    CallClaude --> ClaudeResponse{Claude Returns JSON:<br/>element, confidence,<br/>sensitive, reasoning}
+    Auto1 --> Store[(Databricks Unity Catalog<br/>Governance Table)]
+    Auto2 --> Store
+    Manual --> Review[Web UI Review]
+    Review -->|Approve| Store
+    Review -->|Reject| End
 
-    Pattern --> AutoApprove
-    Cache --> AutoApprove
-    ClaudeResponse --> AutoApprove
+    Store --> Apply[Apply Tags<br/>ALTER TABLE SET TAGS]
+    Apply --> Tags[Unity Catalog<br/>Tagged & Governed]
+    Tags --> End([Complete])
 
-    AutoApprove{Auto-Approval Logic}
-    AutoApprove -->|Confidence ≥95%<br/>+ Pattern Match| Tier1Approve[Status: AUTO_APPROVED<br/>Approval Tier: 1]
-    AutoApprove -->|Confidence ≥85%<br/>+ Non-Sensitive| Tier2Approve[Status: AUTO_APPROVED<br/>Approval Tier: 2]
-    AutoApprove -->|Confidence <85%<br/>OR Sensitive| ManualReview[Status: PENDING<br/>Requires Review: True]
-
-    Tier1Approve --> Store
-    Tier2Approve --> Store
-    ManualReview --> Store
-
-    Store[Store in Governance Table<br/>org_governance.classification_governance]
-    Store --> NextCol{More Columns?}
-    NextCol -->|Yes| Loop
-    NextCol -->|No| ShowReview
-
-    ShowReview[Display in Review Tab<br/>Filter by Status]
-    ShowReview --> UserAction{User Action}
-
-    UserAction -->|Approve| Approved[Update: APPROVED]
-    UserAction -->|Reject| Rejected[Update: REJECTED]
-    UserAction -->|Edit Element| EditClass[Update Element<br/>Set to PENDING]
-
-    Approved --> ApplyTags
-    Rejected --> End
-    EditClass --> ShowReview
-
-    ApplyTags([User: Apply Tags])
-    ApplyTags --> GetApproved[Get All APPROVED/<br/>AUTO_APPROVED Classifications]
-    GetApproved --> LoopApply{For Each Classification}
-
-    LoopApply --> AlterTable[Execute SQL:<br/>ALTER TABLE catalog.schema.table<br/>ALTER COLUMN col_name<br/>SET TAGS 'element_name' = 'Yes']
-    AlterTable --> UpdateStatus[Update Status:<br/>review_status = 'APPLIED']
-    UpdateStatus --> NextTag{More Tags?}
-    NextTag -->|Yes| LoopApply
-    NextTag -->|No| Complete
-
-    Complete[Tags Applied to Unity Catalog<br/>Visible in Catalog Explorer]
-    Complete --> End([End])
-
-    style Tier1 fill:#e1f5ff
-    style Tier2 fill:#fff3e0
-    style Tier3 fill:#f3e5f5
-    style CallClaude fill:#c8e6c9
-    style AlterTable fill:#ffcdd2
-    style Complete fill:#c5e1a5
+    style Pattern fill:#e1f5ff
+    style Cache fill:#fff3e0
+    style AI fill:#c8e6c9
+    style Tags fill:#c5e1a5
 ```
 
 ### Flow Explanation
