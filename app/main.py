@@ -70,8 +70,8 @@ TARGET_CATALOG = os.environ.get('TARGET_CATALOG', 'main')
 ORG_NAME = os.environ.get('ORG_NAME', 'carmax')
 
 # Schema names based on organization
-TAXONOMY_SCHEMA = f"main.{ORG_NAME}_taxonomy"
-GOVERNANCE_SCHEMA = f"main.{ORG_NAME}_governance"
+TAXONOMY_SCHEMA = f"{TARGET_CATALOG}.{ORG_NAME}_taxonomy"
+GOVERNANCE_SCHEMA = f"{TARGET_CATALOG}.{ORG_NAME}_governance"
 
 # Initialize Databricks client
 w = WorkspaceClient()
@@ -474,15 +474,21 @@ def get_classifications():
         limit = int(request.args.get('limit', 100))
 
         # Validate status against allowed values
-        allowed_statuses = ['PENDING', 'APPROVED', 'REJECTED', 'AUTO_APPROVED', 'APPLIED']
+        allowed_statuses = ['PENDING', 'APPROVED', 'REJECTED', 'AUTO_APPROVED', 'APPLIED', 'ALL']
         status = validate_enum_value(status, allowed_statuses, 'status')
 
         # Build query
-        # Handle NULL review_status for pending records
-        if status == 'PENDING':
-            where_clauses = ["(review_status IS NULL OR review_status = 'PENDING')"]
+        where_clauses = []
+
+        # Handle status filtering
+        if status == 'ALL':
+            # No status filter - show all records
+            pass
+        elif status == 'PENDING':
+            # Handle NULL review_status for pending records
+            where_clauses.append("(review_status IS NULL OR review_status = 'PENDING')")
         else:
-            where_clauses = [f"review_status = '{status}'"]
+            where_clauses.append(f"review_status = '{status}'")
 
         if priority:
             # Validate priority against allowed values
@@ -490,7 +496,8 @@ def get_classifications():
             priority = validate_enum_value(priority, allowed_priorities, 'priority')
             where_clauses.append(f"review_priority = '{priority}'")
 
-        where_clause = ' AND '.join(where_clauses)
+        # Build WHERE clause (only if there are filters)
+        where_clause = ' AND '.join(where_clauses) if where_clauses else '1=1'
 
         sql = f"""
         SELECT
@@ -544,11 +551,7 @@ def approve_classification(id):
         sql = f"""
         UPDATE {GOVERNANCE_SCHEMA}.classification_governance
         SET
-            review_status = 'APPROVED',
-            approved_element = suggested_element,
-            reviewer = current_user(),
-            reviewed_at = current_timestamp(),
-            review_notes = '{notes.replace("'", "''")}'
+            review_status = 'APPROVED'
         WHERE id = {id}
         """
 
@@ -569,10 +572,7 @@ def reject_classification(id):
         sql = f"""
         UPDATE {GOVERNANCE_SCHEMA}.classification_governance
         SET
-            review_status = 'REJECTED',
-            reviewer = current_user(),
-            reviewed_at = current_timestamp(),
-            review_notes = '{reason.replace("'", "''")}'
+            review_status = 'REJECTED'
         WHERE id = {id}
         """
 
@@ -622,17 +622,7 @@ def update_classification_element(id):
             review_status = CASE
                 WHEN review_status IN ('APPROVED', 'AUTO_APPROVED', 'APPLIED') THEN 'PENDING'
                 ELSE review_status
-            END,
-            approved_element = NULL,
-            reviewer = CASE
-                WHEN review_status IN ('APPROVED', 'AUTO_APPROVED', 'APPLIED') THEN NULL
-                ELSE reviewer
-            END,
-            reviewed_at = CASE
-                WHEN review_status IN ('APPROVED', 'AUTO_APPROVED', 'APPLIED') THEN NULL
-                ELSE reviewed_at
-            END,
-            review_notes = '{notes.replace("'", "''")}'
+            END
         WHERE id = {id}
         """
 
@@ -667,11 +657,7 @@ def bulk_approve():
         sql = f"""
         UPDATE {GOVERNANCE_SCHEMA}.classification_governance
         SET
-            review_status = 'APPROVED',
-            approved_element = suggested_element,
-            reviewer = current_user(),
-            reviewed_at = current_timestamp(),
-            review_notes = 'Bulk approved (confidence >= {min_confidence}%)'
+            review_status = 'APPROVED'
         WHERE {where_clause}
         """
 
@@ -702,12 +688,11 @@ def apply_tags():
             schema_name,
             table_name,
             column_name,
-            COALESCE(approved_element, suggested_element) as element
+            suggested_element as element
         FROM {GOVERNANCE_SCHEMA}.classification_governance
         WHERE review_status IN ('APPROVED', 'AUTO_APPROVED')
-          AND applied_at IS NULL
-          AND COALESCE(approved_element, suggested_element) IS NOT NULL
-          AND LOWER(COALESCE(approved_element, suggested_element)) NOT IN ('no matching element', 'no match', 'none', 'unknown')
+          AND suggested_element IS NOT NULL
+          AND LOWER(suggested_element) NOT IN ('no matching element', 'no match', 'none', 'unknown')
         LIMIT 100
         """
 
@@ -736,8 +721,7 @@ def apply_tags():
                 update_sql = f"""
                 UPDATE {GOVERNANCE_SCHEMA}.classification_governance
                 SET
-                    review_status = 'APPLIED',
-                    applied_at = current_timestamp()
+                    review_status = 'APPLIED'
                 WHERE id = {item['id']}
                 """
 
@@ -781,7 +765,7 @@ def apply_tags():
 def get_dashboard_stats():
     """Get dashboard statistics"""
     try:
-        stats_sql = """
+        stats_sql = f"""
         SELECT
             COUNT(*) as total_classified,
             SUM(CASE WHEN (review_status IS NULL OR review_status = 'PENDING') THEN 1 ELSE 0 END) as pending_review,
@@ -826,7 +810,7 @@ def _get_unclassified_columns(catalog, schema, tables=None, columns_filter=None)
     where_clauses = [
         f"c.table_catalog = '{catalog}'",
         f"c.table_schema = '{schema}'",
-        "g.id IS NULL",
+        "g.catalog_name IS NULL",
         "c.column_name NOT IN ('_rescued_data', '_metadata')"
     ]
 

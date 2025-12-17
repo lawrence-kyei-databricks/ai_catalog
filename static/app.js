@@ -240,10 +240,7 @@ async function loadReview() {
 
     try {
         // Build API URL with status filter
-        let apiUrl = '/api/classifications';
-        if (statusFilter !== 'ALL') {
-            apiUrl += `?status=${statusFilter}`;
-        }
+        const apiUrl = `/api/classifications?status=${statusFilter}`;
 
         const response = await fetch(apiUrl);
         const data = await response.json();

@@ -31,7 +31,8 @@ class TaxonomyManager:
 
         # Use environment variable for schema name, defaulting to carmax for backward compatibility
         org_name = os.environ.get('ORG_NAME', 'carmax')
-        self.taxonomy_schema = f"main.{org_name}_taxonomy"
+        catalog = os.environ.get('TARGET_CATALOG', 'main')
+        self.taxonomy_schema = f"{catalog}.{org_name}_taxonomy"
 
     def import_from_excel(self,
                           elements_file: str,
