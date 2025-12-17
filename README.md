@@ -99,7 +99,9 @@ This creates two schemas:
 - `main.{ORG_NAME}_taxonomy` - Data element definitions
 - `main.{ORG_NAME}_governance` - Classification tracking
 
-### Step 3: Import Your Taxonomy
+### Step 3: Import Your Taxonomy (Optional)
+
+You can import taxonomy data either now via script OR later via the web UI after deployment.
 
 Prepare your taxonomy Excel/CSV files with these columns:
 
@@ -114,17 +116,19 @@ Prepare your taxonomy Excel/CSV files with these columns:
 - Data Subject Type Name (e.g., "Customer")
 - Description
 
-Option A - Using default file paths (place files in `data/` folder):
+**Option A** - Import now via script (using default file paths in `data/` folder):
 ```bash
 python3 scripts/import_taxonomy.py
 ```
 
-Option B - Using custom file paths:
+**Option B** - Import now via script (using custom file paths):
 ```bash
 python3 scripts/import_taxonomy.py \
   --elements-file /path/to/your/elements.xlsx \
   --subjects-file /path/to/your/subjects.xlsx
 ```
+
+**Option C** - Skip for now and import later via the Taxonomy tab in the web UI (see "How To Use" section below)
 
 ### Step 4: Configure and Deploy the App
 
@@ -139,7 +143,7 @@ Deploy the app:
 databricks bundle deploy -t dev
 ```
 
-### Step 4: Grant Permissions
+### Step 5: Grant Permissions
 
 Grant the app's service principal access to Unity Catalog:
 
@@ -149,7 +153,7 @@ GRANT ALL PRIVILEGES ON SCHEMA main.<your_org>_governance TO `your-service-princ
 GRANT USE CATALOG ON CATALOG main TO `your-service-principal`;
 ```
 
-### Step 5: Access the App
+### Step 6: Access the App
 
 After deployment, Databricks CLI will output the app URL. Open it in your browser to start classifying data!
 
@@ -189,7 +193,7 @@ Query the `INFORMATION_SCHEMA.COLUMN_TAGS` view to see all column tags:
 ```sql
 SELECT *
 FROM main.information_schema.column_tags
-WHERE schema_name = '<your_org>_taxonomy';
+WHERE schema_name = '<your_org>_taxonomy';  -- e.g., 'carmax_taxonomy'
 ```
 
 For more details on Unity Catalog tags, see: https://docs.databricks.com/en/data-governance/unity-catalog/tags.html
@@ -245,7 +249,7 @@ Update these files for your organization:
 - Ensure service principal has warehouse access and USE CATALOG permission on the main catalog
 
 **App not starting or crashes:**
-- Verify `WAREHOUSE_ID` is correct in `app.yaml`
+- Verify `WAREHOUSE_ID` is correct in `databricks.yml`
 - Verify `ORG_NAME` is set correctly (defaults to "carmax" if not set)
 - Check that schemas exist before starting the app
 - Review app logs for missing environment variables
