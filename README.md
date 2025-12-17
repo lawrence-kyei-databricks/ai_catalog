@@ -99,9 +99,7 @@ This creates two schemas:
 - `main.{ORG_NAME}_taxonomy` - Data element definitions
 - `main.{ORG_NAME}_governance` - Classification tracking
 
-### Step 3: Import Your Taxonomy (Optional)
-
-You can import taxonomy data either now via script OR later via the web UI after deployment.
+### Step 3: Import Your Taxonomy
 
 Prepare your taxonomy Excel/CSV files with these columns:
 
@@ -116,19 +114,17 @@ Prepare your taxonomy Excel/CSV files with these columns:
 - Data Subject Type Name (e.g., "Customer")
 - Description
 
-**Option A** - Import now via script (using default file paths in `data/` folder):
+**Option A** - Using default file paths (place files in `data/` folder):
 ```bash
 python3 scripts/import_taxonomy.py
 ```
 
-**Option B** - Import now via script (using custom file paths):
+**Option B** - Using custom file paths:
 ```bash
 python3 scripts/import_taxonomy.py \
   --elements-file /path/to/your/elements.xlsx \
   --subjects-file /path/to/your/subjects.xlsx
 ```
-
-**Option C** - Skip for now and import later via the Taxonomy tab in the web UI (see "How To Use" section below)
 
 ### Step 4: Configure and Deploy the App
 
@@ -166,7 +162,6 @@ View statistics about your taxonomy and classifications.
 - View all your data elements
 - Add, edit, or delete elements
 - Search and filter by category
-- Import taxonomy from Excel files
 
 ### 3. Classify Tab
 1. Select a catalog and schema
@@ -233,10 +228,10 @@ Update these files for your organization:
 ## Troubleshooting
 
 **No data elements showing in Taxonomy tab:**
-- Use the Taxonomy tab's "Import from Excel" feature to load your taxonomy
+- Run the taxonomy import script: `python3 scripts/import_taxonomy.py`
 - Ensure your Excel files have the required columns (see Step 3 above)
-- Check browser console for errors
 - Verify the `ORG_NAME` environment variable matches your deployed schema name
+- Check that data was loaded into the `{ORG_NAME}_taxonomy.data_elements` table
 
 **Schema not found errors:**
 - Run `python3 scripts/setup_schemas.py` to create required schemas
@@ -255,12 +250,12 @@ Update these files for your organization:
 - Review app logs for missing environment variables
 
 **Classification not working:**
-- Ensure you've imported taxonomy data via the Taxonomy tab
+- Ensure you've imported taxonomy data via `scripts/import_taxonomy.py`
 - Verify the model endpoint `databricks-claude-3-7-sonnet` is available in your workspace
 - Check that the selected catalog/schema exists and you have permissions
 
 **Tags not showing in Unity Catalog:**
-- Tag creation happens automatically when you import taxonomy via the Taxonomy tab
+- Tag creation happens automatically when you import taxonomy via the import script
 - Check that you have tag creation permissions in Unity Catalog
 - Review app logs for tag creation errors (may show rate limiting)
 
