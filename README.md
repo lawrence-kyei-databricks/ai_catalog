@@ -22,7 +22,7 @@ flowchart TB
     Tier2 -->|No Cache| Tier3
 
     Tier3[Tier 3: Claude AI Classification]
-    Tier3 --> LoadTax[Load 172-Element Taxonomy<br/>from {org}_taxonomy.data_elements]
+    Tier3 --> LoadTax[Load 172-Element Taxonomy<br/>from org_taxonomy.data_elements]
     LoadTax --> Sample[Get 100 Sample Values<br/>SELECT col FROM table LIMIT 100]
     Sample --> BuildPrompt[Build AI Prompt:<br/>- Column name & type<br/>- Sample values<br/>- Full taxonomy<br/>- Classification instructions]
     BuildPrompt --> CallClaude[Call ai_query<br/>Model: databricks-claude-3-7-sonnet]
@@ -42,7 +42,7 @@ flowchart TB
     Tier2Approve --> Store
     ManualReview --> Store
 
-    Store[Store in Governance Table<br/>{org}_governance.classification_governance]
+    Store[Store in Governance Table<br/>org_governance.classification_governance]
     Store --> NextCol{More Columns?}
     NextCol -->|Yes| Loop
     NextCol -->|No| ShowReview
