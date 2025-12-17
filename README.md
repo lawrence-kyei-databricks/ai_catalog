@@ -6,6 +6,96 @@ AI-powered data classification using Unity Catalog, and Claude 3.7 Sonnet.
 
 Automatically classifies database columns against your organization's data taxonomy. Uses AI to identify sensitive data like SSN, email addresses, and personal information, then applies Unity Catalog tags for governance.
 
+## Architecture & Backend Flow
+
+```mermaid
+flowchart TB
+    Start([User: Classify New Table]) --> Discover[Discover All Columns<br/>Query system.information_schema]
+    Discover --> Loop{For Each Column}
+
+    Loop --> Tier1{Tier 1: Pattern Match?<br/>Regex: SSN, Email, Phone, CC}
+    Tier1 -->|Match| Pattern[Return Element<br/>Confidence: 100%<br/>Source: PATTERN]
+    Tier1 -->|No Match| Tier2
+
+    Tier2{Tier 2: Cache Hit?<br/>Check Fingerprint}
+    Tier2 -->|Found & High Confidence| Cache[Return Cached Element<br/>Confidence: 95%+<br/>Source: CACHE]
+    Tier2 -->|No Cache| Tier3
+
+    Tier3[Tier 3: Claude AI Classification]
+    Tier3 --> LoadTax[Load 172-Element Taxonomy<br/>from {org}_taxonomy.data_elements]
+    LoadTax --> Sample[Get 100 Sample Values<br/>SELECT col FROM table LIMIT 100]
+    Sample --> BuildPrompt[Build AI Prompt:<br/>- Column name & type<br/>- Sample values<br/>- Full taxonomy<br/>- Classification instructions]
+    BuildPrompt --> CallClaude[Call ai_query<br/>Model: databricks-claude-3-7-sonnet]
+
+    CallClaude --> ClaudeResponse{Claude Returns JSON:<br/>element, confidence,<br/>sensitive, reasoning}
+
+    Pattern --> AutoApprove
+    Cache --> AutoApprove
+    ClaudeResponse --> AutoApprove
+
+    AutoApprove{Auto-Approval Logic}
+    AutoApprove -->|Confidence ≥95%<br/>+ Pattern Match| Tier1Approve[Status: AUTO_APPROVED<br/>Approval Tier: 1]
+    AutoApprove -->|Confidence ≥85%<br/>+ Non-Sensitive| Tier2Approve[Status: AUTO_APPROVED<br/>Approval Tier: 2]
+    AutoApprove -->|Confidence <85%<br/>OR Sensitive| ManualReview[Status: PENDING<br/>Requires Review: True]
+
+    Tier1Approve --> Store
+    Tier2Approve --> Store
+    ManualReview --> Store
+
+    Store[Store in Governance Table<br/>{org}_governance.classification_governance]
+    Store --> NextCol{More Columns?}
+    NextCol -->|Yes| Loop
+    NextCol -->|No| ShowReview
+
+    ShowReview[Display in Review Tab<br/>Filter by Status]
+    ShowReview --> UserAction{User Action}
+
+    UserAction -->|Approve| Approved[Update: APPROVED]
+    UserAction -->|Reject| Rejected[Update: REJECTED]
+    UserAction -->|Edit Element| EditClass[Update Element<br/>Set to PENDING]
+
+    Approved --> ApplyTags
+    Rejected --> End
+    EditClass --> ShowReview
+
+    ApplyTags([User: Apply Tags])
+    ApplyTags --> GetApproved[Get All APPROVED/<br/>AUTO_APPROVED Classifications]
+    GetApproved --> LoopApply{For Each Classification}
+
+    LoopApply --> AlterTable[Execute SQL:<br/>ALTER TABLE catalog.schema.table<br/>ALTER COLUMN col_name<br/>SET TAGS 'element_name' = 'Yes']
+    AlterTable --> UpdateStatus[Update Status:<br/>review_status = 'APPLIED']
+    UpdateStatus --> NextTag{More Tags?}
+    NextTag -->|Yes| LoopApply
+    NextTag -->|No| Complete
+
+    Complete[Tags Applied to Unity Catalog<br/>Visible in Catalog Explorer]
+    Complete --> End([End])
+
+    style Tier1 fill:#e1f5ff
+    style Tier2 fill:#fff3e0
+    style Tier3 fill:#f3e5f5
+    style CallClaude fill:#c8e6c9
+    style AlterTable fill:#ffcdd2
+    style Complete fill:#c5e1a5
+```
+
+### Flow Explanation
+
+**Classification Pipeline (3-Tier System):**
+1. **Tier 1 - Pattern Rules:** Fast regex matching for common PII (SSN, Email, Phone, Credit Card)
+2. **Tier 2 - Cache Lookup:** Reuse high-confidence classifications from similar columns (fingerprint-based)
+3. **Tier 3 - Claude AI:** Use Claude 3.7 Sonnet via `ai_query()` for intelligent classification
+
+**Auto-Approval Logic:**
+- **Tier 1 (≥95% + Pattern):** Immediate auto-approval
+- **Tier 2 (≥85% + Non-Sensitive):** Conditional auto-approval
+- **Tier 3 (<85% or Sensitive):** Manual review required
+
+**Tag Application:**
+- Executes `ALTER TABLE ... SET TAGS` for each approved classification
+- Updates tracking table to `APPLIED` status
+- Tags become visible in Unity Catalog
+
 ## Key Features
 
 - AI classification with Claude 3.7 Sonnet
